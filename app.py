@@ -51,7 +51,7 @@ BUFFER_CLEANUP_INTERVAL = 60
 # 使用者 session 計數器：話題結束後遞增，產生新的 thread_id
 user_sessions = {}  # {user_id: session_counter}
 
-async def run_langgraph(user_id: str, user_text: str, pre_intent: str = None) -> tuple[str, list]:
+async def run_langgraph(user_id: str, user_text: str) -> tuple[str, list]:
     """將使用者訊息送入 LangGraph，並利用 user_id 維持對話記憶"""
     try:
         # 1. 設定對話的 Thread ID，讓 MemorySaver 知道這是哪位使用者的歷史紀錄
@@ -65,12 +65,10 @@ async def run_langgraph(user_id: str, user_text: str, pre_intent: str = None) ->
             }
         }
 
-        # 2. 建立輸入狀態 (只需傳入你的 state.py 定義好的 question)
+        # 2. 建立輸入狀態
         inputs = {
             "question": user_text
         }
-        if pre_intent:
-            inputs["intent"] = pre_intent
 
         # 3. 記錄執行前的 history 長度，用於區分本次 run 新增的 history items
         prev_state = await langgraph_app.aget_state(config)
@@ -123,15 +121,14 @@ async def send_line_message(user_id: str, reply_token: str, message_text: str):
             print("✅ Push 成功！(花費額度)")
 
 
-async def langgraph_and_reply(user_id: str, reply_token: str, text: str, pre_intent: str = None) -> tuple[bool, bool]:
+async def langgraph_and_reply(user_id: str, reply_token: str, text: str) -> tuple[bool, bool]:
     """執行 LangGraph 並回覆使用者，回傳 (是否需要後續 slot 追問, 話題是否已結束)"""
     print(f"\n🚀 [開始處理] 準備將 '{text}' 送入 LangGraph...")
-    ai_response, history = await run_langgraph(user_id, text, pre_intent=pre_intent)
+    ai_response, history = await run_langgraph(user_id, text)
     print(f"🧠 [LangGraph] 思考完畢！準備回傳...")
     await send_line_message(user_id, reply_token, ai_response)
-    needs_followup = "ask_missing_slots" in history
     topic_resolved = "topic_resolved" in history
-    return needs_followup, topic_resolved
+    return False, topic_resolved
 
 
 async def process_and_reply(user_id: str, reply_token: str):
@@ -158,22 +155,19 @@ async def process_and_reply(user_id: str, reply_token: str):
             result = {"completeness": evaluate_completeness(combined_text), "intent": None}
 
         score = result["completeness"]
-        pre_intent = result.get("intent")
 
         # Phase 2: 不完整 → 反問使用者意圖，等待補充
         if score < threshold:
-            print(f"[Debounce] text='{combined_text}' score={score:.2f} intent={pre_intent} → 反問意圖")
+            print(f"[Debounce] text='{combined_text}' score={score:.2f} → 反問意圖")
             clarification = generate_clarification_text(INTENTS_CONFIG)
             await send_line_message(user_id, reply_token, clarification)
             user_buffers[user_id]["awaiting_clarification"] = True
             return
         else:
-            print(f"[Debounce] text='{combined_text}' score={score:.2f} intent={pre_intent} wait={min_wait}s")
+            print(f"[Debounce] text='{combined_text}' score={score:.2f} wait={min_wait}s")
 
-        # Phase 3: 帶著 pre_intent 進 LangGraph
-        needs_followup, topic_resolved = await langgraph_and_reply(user_id, reply_token, combined_text, pre_intent)
-        if needs_followup and user_id in user_buffers:
-            user_buffers[user_id]["awaiting_clarification"] = True
+        # Phase 3: 送入 LangGraph（Agent 自行決定工具呼叫）
+        needs_followup, topic_resolved = await langgraph_and_reply(user_id, reply_token, combined_text)
         if topic_resolved:
             user_sessions[user_id] = user_sessions.get(user_id, 0) + 1
             print(f"  [Session] {user_id} 話題已結束，session 遞增為 {user_sessions[user_id]}")

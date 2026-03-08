@@ -1,5 +1,5 @@
 import os
-from langchain_google_vertexai import ChatVertexAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 def build_vertexai_llm(config: dict):
     model_name = config.get("model_name", "gemini-2.5-flash")
@@ -17,9 +17,10 @@ def build_vertexai_llm(config: dict):
     if not location:
         raise ValueError(f"缺少 GCP 區域！請在 .env 檔案中設定 {location_env}")
 
-    return ChatVertexAI(
+    return ChatGoogleGenerativeAI(
         model=model_name,
         temperature=temperature,
         project=project_id,
         location=location,
+        vertexai=True,
     )
