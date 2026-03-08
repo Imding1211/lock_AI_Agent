@@ -1,0 +1,189 @@
+# ==========================================
+# 客服系統 - 核心設定檔 (config.toml)
+# ==========================================
+# 說明：
+# 1. 本檔案定義系統的「語言模型」與「檢索流程」。
+# 2. 陣列 [[databases]] 的上下順序，即為 LangGraph 檢索的優先順序。
+# 3. 帶有資安機密性質的資料，請寫在對應的 `_env` 變數中，並由 .env 檔案提供。
+# 4. 若不需要某個功能，將該 [[databases]] 區塊全數加上 # 註解即可。
+# ==========================================
+
+
+# ==========================================
+# 系統全局設定
+# ==========================================
+[system]
+domain = "電子鎖、智慧門鎖相關的產品、安裝、故障排除與售後服務"
+
+
+# ==========================================
+# 智慧防抖設定 (Debounce)
+# ==========================================
+[debounce]
+enabled = true                         # false 時退回規則式，true 時使用 [llm] 的語言模型
+
+# 等待時間設定
+min_wait = 1.5                         # 最短等待（秒）— 完整訊息用這個
+max_wait = 5.0                         # 最長等待（秒）— 片段訊息用這個
+completeness_threshold = 0.5           # 完整性門檻（0.0~1.0）
+
+
+# ==========================================
+# Line Bot 系統設定
+# ==========================================
+[line_bot]
+# Loading 動畫顯示時間 (秒，必須是 5 的倍數，範圍 5~60)
+loading_animation_time = 5
+
+# ==========================================
+# 系統回覆罐頭訊息範本 (Templates)
+# ==========================================
+[templates]
+# 當發生錯誤或需要除錯時的系統提示綴詞
+push_fallback_prefix = "【系統通知】讓您久等了，以下是您的回覆：\n"
+
+
+# ------------------------------------------
+# 語言模型設定 (LLM)
+# ------------------------------------------
+[llm]
+provider = "vertexai"                # 支援的 provider: "ollama"、"gemini" 或 "vertexai"
+model_name = "gemini-2.5-flash"           # Ollama 填 "gemma3:4b"；Gemini 填 "gemini-2.5-flash"；Vertex AI 填 "gemini-2.5-flash"
+temperature = 0.3                  # 數值越低回答越保守穩定 (0.0 ~ 1.0)
+
+# [Gemini 專用設定]
+api_key_env = "GEMINI_API_KEY"     # 請在 .env 中設定此變數
+
+# [Ollama 專用設定]
+base_url = "http://localhost:11434"
+base_url_env = "OLLAMA_BASE_URL"   # 優先讀取環境變數，若環境變數為空，則使用上方 base_url
+
+# [Vertex AI 專用設定] (使用 ADC 驗證，需先執行 gcloud auth application-default login)
+project_id_env = "VERTEX_PROJECT_ID"  # 請在 .env 中設定 GCP 專案 ID
+location_env = "VERTEX_LOCATION"      # 請在 .env 中設定 GCP 區域 (例: us-central1)
+
+
+# ------------------------------------------
+# 檢索節點設定 (Databases / Retrievers)
+# ------------------------------------------
+
+# --- 優先級 1：產品手冊 (Chroma 向量庫) ---
+[[databases]]
+name = "db_smartlock_manual"
+type = "chroma"
+description = "智能門鎖規格、設定與保固手冊"
+path = "./chroma_db_default"
+top_k = 3
+
+# 向量模型設定 (轉成向量時使用的模型)
+embedding_provider = "ollama"
+embedding_model = "nomic-embed-text"
+embedding_base_url = "http://localhost:11434"
+embedding_base_url_env = "OLLAMA_BASE_URL"
+
+# --- 優先級 2：常見故障排除 (Chroma 向量庫) ---
+# (展示如何無痛擴充第二個獨立的向量庫)
+[[databases]]
+name = "db_troubleshooting"
+type = "chroma"
+description = "常見故障排除與維修指南"
+path = "./chroma_db_troubleshoot"
+top_k = 2
+
+# 向量模型設定
+embedding_provider = "ollama"
+embedding_model = "nomic-embed-text"
+embedding_base_url = "http://localhost:11434"
+embedding_base_url_env = "OLLAMA_BASE_URL"
+
+# --- 優先級 3：即時訂單查詢 (RESTful API) ---
+[[databases]]
+name = "db_order_api"
+type = "api"
+description = "查詢即時訂單狀態與報修進度"
+
+# API 連線設定
+endpoint = "https://api.sunnie-lock.com/v1/status" # 公開測試網址
+endpoint_env = "ORDER_API_URL"                     # (優先) 從 .env 讀取真實機密網址
+token_env = "ORDER_API_TOKEN"                      # (選用) 從 .env 讀取 Bearer Token 授權碼
+method = "GET"
+timeout = 5
+
+# API 參數對應
+query_param = "keyword"      # 發送請求時，使用者的問題要放在哪個參數？ (例: ?keyword=問題)
+response_key = "message"     # 接收回傳時，要抓取 JSON 裡的哪一個欄位作為 Context？
+
+
+# --- 優先級 4：網頁搜尋 (Web Search Fallback) ---
+# 作為最後一道防線，當內部資料庫都找不到時上網搜尋
+[[databases]]
+name = "db_web_search"
+type = "web_search"
+description = "網際網路搜尋引擎"
+
+# 搜尋引擎設定
+search_engine = "duckduckgo" # 內建免費、免金鑰的搜尋引擎
+max_results = 3
+
+
+# ==========================================
+# 意圖偵測路由設定 (Intent Routing)
+# ==========================================
+
+[[intents]]
+name = "order_status"
+label = "查詢訂單或維修進度"
+description = "使用者想查詢訂單進度、出貨狀況、物流狀態或維修進度"
+target = "db_order_api"
+require_slots = false
+
+[[intents]]
+name = "troubleshooting"
+label = "設備故障排除"
+description = "使用者遇到設備故障、沒有反應、錯誤代碼或需要排除問題"
+target = "db_troubleshooting"
+require_slots = true
+
+[[intents]]
+name = "general_knowledge"
+label = "產品規格與操作問題"
+description = "關於產品規格、如何設定、一般操作問題，或是其他無法分類的問題"
+target = "db_smartlock_manual"
+require_slots = false
+
+[[intents]]
+name = "out_of_domain"
+description = "使用者的問題明顯與電子鎖、智慧門鎖完全無關，例如天氣、股票、美食推薦等"
+target = "out_of_domain"
+require_slots = false
+
+[[intents]]
+name = "transfer_human"
+label = "轉接真人客服"
+description = "使用者明確要求轉接真人客服，或是對『是否轉接真人』的問題回答『好』、『需要』、『麻煩你了』。"
+target = "human"
+require_slots = false
+
+# ==========================================
+# 對話記憶儲存設定 (Memory / Checkpointer)
+# ==========================================
+[memory]
+type = "memory"  # 目前先用記憶體版，未來可以改成 "sqlite" 或 "postgres"
+# path = "./chat_history.db"  # 未來如果是 sqlite，可以在這裡設定路徑
+topic_shift_detection = true       # 啟用話題轉換偵測（取代 resolution_detection）
+
+
+# ==========================================
+# 必填資訊收集 (Slot Filling)
+# ==========================================
+[required_slots]
+device_model = "使用者的電子鎖型號。"
+device_brand = "使用者的電子鎖品牌。"
+
+
+# ==========================================
+# 使用者輪廓記憶設定 (User Profile Memory)
+# ==========================================
+[user_profile]
+enabled = true
+profile_dir = "./user_profiles"

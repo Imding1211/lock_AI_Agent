@@ -1,0 +1,14 @@
+langchain-text-splitters
+langchain_google_genai
+langchain-google-vertexai
+langchain-community
+langchain-ollama
+langchain-chroma
+duckduckgo-search
+python-dotenv
+line-bot-sdk
+langgraph
+requests
+fastapi
+uvicorn
+ddgs

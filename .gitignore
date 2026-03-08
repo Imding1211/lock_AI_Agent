@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虛擬環境
+venv/
+.venv/
+env/
+
+# 環境變數與機密
+.env
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ChromaDB 向量資料庫（可由 seed_db.py 重建）
+chroma_db_default/
+chroma_db_troubleshoot/
+
+# 使用者輪廓（執行時動態產生）
+user_profiles/
+
+# Jupyter
+.ipynb_checkpoints/
