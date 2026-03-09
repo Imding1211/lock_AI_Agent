@@ -3,67 +3,20 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from core.config import (
     LLM_CONFIG, INTENTS_CONFIG, REQUIRED_SLOTS,
-    SYSTEM_CONFIG, USER_PROFILE_CONFIG, MEMORY_CONFIG
+    SYSTEM_CONFIG, USER_PROFILE_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 )
 from profiles import ProfileManager
 from graph.state import GraphState
 from llms import get_llm
+from agents import load_prompt_template
 
 llm = get_llm(LLM_CONFIG)
 profile_manager = ProfileManager(USER_PROFILE_CONFIG)
 
 
-def build_system_prompt(user_profile: str) -> str:
-    """動態組裝系統提示詞"""
-    domain = SYSTEM_CONFIG.get("domain", "電子鎖")
-
-    profile_section = "新使用者，尚無歷史資料。"
-    if user_profile:
-        profile_section = user_profile
-
-    slots_section = ""
-    if REQUIRED_SLOTS:
-        slots_lines = "\n".join([f"  - {k}: {v}" for k, v in REQUIRED_SLOTS.items()])
-        slots_section = f"""
-7. 進行故障排除前，必須確認以下設備資訊（若使用者背景中已有則直接使用，不必重複詢問）：
-{slots_lines}
-   如果使用者無法提供，仍可給予通用建議，但應提醒資訊不足可能影響準確度。"""
-
-    # 從 intents config 取得意圖描述，供 LLM 理解業務範圍
-    intent_descriptions = ""
-    if INTENTS_CONFIG:
-        lines = []
-        for intent in INTENTS_CONFIG:
-            label = intent.get("label", intent["name"])
-            desc = intent.get("description", "")
-            lines.append(f"  - {label}: {desc}")
-        intent_descriptions = "\n".join(lines)
-
-    return f"""你是一位專業、友善的「{domain}」客服助理。
-
-## 使用者背景
-{profile_section}
-
-## 業務範圍
-{intent_descriptions}
-
-## 行為準則
-1. 一律使用繁體中文回答。
-2. 只回答與「{domain}」相關的問題。若使用者的問題明顯與「{domain}」完全無關（例如天氣、股票、美食），請禮貌拒絕並提醒你的服務範圍。
-3. 嚴格根據工具回傳的資料來回答，不可編造資訊。
-4. 若某個工具的回傳資料不足以回答，請嘗試使用其他工具。
-5. 當所有工具都無法提供足夠資訊時，使用 transfer_to_human 工具轉接真人客服。
-6. 使用者明確要求轉接真人時，直接使用 transfer_to_human 工具。{slots_section}
-
-## 回覆風格
-- 語氣親切自然，像真人對話。
-- 條理分明，適當使用編號或分點說明。
-- 回答要精確且簡潔，避免冗長。"""
-
-
 async def pre_process(state: GraphState, config: RunnableConfig):
-    """載入 user profile、將 question 轉為 HumanMessage、組裝 system prompt"""
-    print("  [pre_process] 正在準備 Agent 輸入...")
+    """載入 user profile、將 question 轉為 HumanMessage"""
+    print("  [pre_process] 正在準備輸入...")
 
     # 載入 user profile
     user_profile = ""
@@ -76,16 +29,11 @@ async def pre_process(state: GraphState, config: RunnableConfig):
         else:
             print(f"  [pre_process] {user_id} 尚無歷史輪廓")
 
-    # 組裝 system prompt
-    system_prompt = build_system_prompt(user_profile)
-
-    # 建立 messages：system + 歷史對話 + 當前問題
-    messages = [SystemMessage(content=system_prompt)]
+    # 建立 messages：歷史對話 + 當前問題
+    messages = []
 
     # 加入歷史對話（來自 chat_history）
     past_dialogue = state.get("chat_history", [])
-
-    # 話題轉換偵測：若啟用，在 system prompt 中已有指引，agent 會自行處理
     topic_shift_enabled = MEMORY_CONFIG.get("topic_shift_detection", False)
     if topic_shift_enabled and past_dialogue:
         history_text = "\n".join(past_dialogue)
@@ -101,53 +49,231 @@ async def pre_process(state: GraphState, config: RunnableConfig):
     }
 
 
-async def agent_llm(state: GraphState):
-    """呼叫 bind_tools 後的 LLM，回傳 AI message（可能包含 tool_calls）"""
-    print("  [agent_llm] LLM 正在思考...")
-    # llm_with_tools 在 builder.py 中透過 bind_tools 建立，這裡用 state 中的 messages 呼叫
-    # 注意：此函數需要在 builder.py 中用 functools.partial 注入 bound_llm
-    raise NotImplementedError("agent_llm should be created via create_agent_llm_node in builder.py")
+async def router(state: GraphState, config: RunnableConfig):
+    """用 LLM 做意圖分類，回傳 next_agent"""
+    print("  [router] 正在分類意圖...")
+
+    domain = SYSTEM_CONFIG.get("domain", "電子鎖")
+    tried_agents = state.get("tried_agents", [])
+
+    # 建構意圖選項清單
+    intent_lines = []
+    for intent in INTENTS_CONFIG:
+        name = intent["name"]
+        label = intent.get("label", name)
+        desc = intent.get("description", "")
+        intent_lines.append(f'- "{name}": {label} — {desc}')
+    intent_list = "\n".join(intent_lines)
+
+    # 建構已嘗試 agent 的提示
+    tried_agents_section = ""
+    if tried_agents:
+        # 找到 tried_agents 對應的 intent targets
+        agent_to_intents = {}
+        for intent in INTENTS_CONFIG:
+            target = intent.get("target", "")
+            if target in tried_agents:
+                agent_to_intents.setdefault(target, []).append(intent["name"])
+        avoided = ", ".join([f'"{i}"' for intents in agent_to_intents.values() for i in intents])
+        if avoided:
+            tried_agents_section = f"\n6. The following intents have already been tried and failed: {avoided}. Choose a DIFFERENT intent."
+
+    # 載入 router prompt
+    router_prompt = load_prompt_template(
+        "agents/prompts/router.md",
+        domain=domain,
+        intent_list=intent_list,
+        tried_agents_section=tried_agents_section,
+    )
+
+    # 取得使用者問題（從 messages 中找最後一個 HumanMessage）
+    question = state.get("question", "")
+
+    response = await llm.ainvoke([
+        SystemMessage(content=router_prompt),
+        HumanMessage(content=question),
+    ])
+
+    # 解析 LLM 回覆的意圖名稱
+    intent_name = response.content.strip().strip('"').strip("'").lower()
+    print(f"  [router] 意圖分類結果: {intent_name}")
+
+    # 從 intents 找到對應的 target (agent name)
+    target = None
+    for intent in INTENTS_CONFIG:
+        if intent["name"] == intent_name:
+            target = intent.get("target", intent_name)
+            break
+
+    if not target:
+        # fallback: 如果 LLM 輸出不在預設意圖中，嘗試直接作為 agent name
+        valid_agents = {a["name"] for a in AGENTS_CONFIG}
+        if intent_name in valid_agents:
+            target = intent_name
+        else:
+            target = "product_expert"  # 預設 fallback
+            print(f"  [router] 未知意圖 '{intent_name}'，fallback 到 product_expert")
+
+    return {
+        "next_agent": target,
+        "history": [f"router:{target}"]
+    }
+
+
+async def handle_out_of_domain(state: GraphState):
+    """禮貌拒絕非業務問題"""
+    print("  [out_of_domain] 禮貌拒絕...")
+    domain = SYSTEM_CONFIG.get("domain", "電子鎖")
+    answer = f"不好意思，我是「{domain}」的專屬客服助理，這個問題不在我的服務範圍內。如果您有任何關於{domain}的問題，我很樂意為您服務！"
+    return {
+        "answer": answer,
+        "history": ["out_of_domain"]
+    }
+
+
+async def handle_transfer_human(state: GraphState, config: RunnableConfig):
+    """轉接真人客服"""
+    print("  [transfer_human] 正在準備轉接...")
+    cfg = config.get("configurable", {})
+    user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
+
+    user_profile = await profile_manager.load_profile(user_id)
+
+    phone = ""
+    address = ""
+    brand_model = ""
+    if user_profile:
+        phone_match = re.search(r'09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}', user_profile)
+        if phone_match:
+            phone = phone_match.group()
+        addr_match = re.search(
+            r'[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[\u4e00-\u9fff\d\s\-]*(?:路|街|巷|弄|號|樓)[\u4e00-\u9fff\d\s\-]*',
+            user_profile
+        )
+        if addr_match:
+            address = addr_match.group().strip()
+
+    has_info = any([brand_model, phone, address])
+    if has_info:
+        header = "您好\n麻煩您確認並補充以下資訊"
+    else:
+        header = "您好\n麻煩您留下以下資訊"
+
+    answer = (
+        f"{header}\n"
+        f"聯絡地址：{address}\n"
+        f"電話：{phone}\n"
+        f"設備品牌型號：{brand_model}\n"
+        f"安裝日期：\n"
+        f"另外再麻煩您錄影整個狀況的影片將其上傳，謝謝您"
+    )
+
+    return {
+        "answer": answer,
+        "history": ["transfer_human", "topic_resolved"]
+    }
+
+
+async def check_agent_result(state: GraphState):
+    """檢查 agent 回覆是否充足，決定繼續或 fallback"""
+    print("  [check_result] 正在評估回覆品質...")
+
+    # 從 messages 取得最後一個 AI text message
+    answer_text = ""
+    for msg in reversed(state.get("messages", [])):
+        if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
+            content = msg.content
+            if isinstance(content, list):
+                text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+                answer_text = "\n".join(text_parts).strip()
+            else:
+                answer_text = str(content).strip()
+            break
+
+    # 檢查是否有 transfer_to_human 工具呼叫
+    for msg in state.get("messages", []):
+        if hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
+            for tc in msg.tool_calls:
+                if tc.get("name") == "transfer_to_human":
+                    print("  [check_result] 偵測到轉接真人，標記為充足")
+                    return {"history": ["check_result:sufficient"]}
+
+    # 用 LLM 評估回覆是否充足
+    insufficient_indicators = [
+        "無法找到", "找不到相關", "沒有找到", "無法提供",
+        "不足以回答", "沒有相關資料", "無相關資料",
+    ]
+    is_insufficient = any(indicator in answer_text for indicator in insufficient_indicators)
+
+    if is_insufficient:
+        tried = state.get("tried_agents", [])
+        current_agent = state.get("next_agent", "")
+        all_agents = {a["name"] for a in AGENTS_CONFIG}
+        remaining = all_agents - set(tried) - {current_agent}
+
+        if remaining:
+            print(f"  [check_result] 回覆不足，嘗試 fallback（剩餘: {remaining}）")
+            return {
+                "next_agent": "__fallback__",
+                "tried_agents": [current_agent],
+                "history": ["check_result:fallback"]
+            }
+        else:
+            print("  [check_result] 所有 agent 已嘗試，轉接真人")
+            return {
+                "next_agent": "__transfer_human__",
+                "tried_agents": [current_agent],
+                "history": ["check_result:all_exhausted"]
+            }
+
+    print("  [check_result] 回覆充足")
+    return {"history": ["check_result:sufficient"]}
 
 
 async def post_process(state: GraphState, config: RunnableConfig):
     """從 agent 最終回覆提取 answer、更新 user profile"""
     print("  [post_process] 正在提取最終回覆並更新輪廓...")
 
-    # 從 messages 中取得最後一個 AI message 作為 answer
-    answer = ""
-    for msg in reversed(state.get("messages", [])):
-        if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
-            content = msg.content
-            # Gemini 可能回傳 list of parts，取出純文字
-            if isinstance(content, list):
-                text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
-                answer = "\n".join(text_parts).strip()
-            else:
-                answer = str(content).strip()
-            break
+    # 如果 answer 已經被設定（例如 out_of_domain 或 transfer_human），直接使用
+    existing_answer = state.get("answer", "")
+    if existing_answer:
+        answer = existing_answer
+    else:
+        # 從 messages 中取得最後一個 AI message 作為 answer
+        answer = ""
+        for msg in reversed(state.get("messages", [])):
+            if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
+                content = msg.content
+                if isinstance(content, list):
+                    text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+                    answer = "\n".join(text_parts).strip()
+                else:
+                    answer = str(content).strip()
+                break
 
     if not answer:
         answer = "抱歉，系統沒有產生回覆。"
 
     print(f"  [post_process] 最終回覆: {answer[:80]}...")
 
-    # 判斷是否為轉接真人（檢查 tool 呼叫歷史）
-    is_transfer = False
+    # 判斷是否為轉接真人（檢查 history）
     topic_resolved = False
-    for msg in state.get("messages", []):
-        if hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
-            for tc in msg.tool_calls:
-                if tc.get("name") == "transfer_to_human":
-                    is_transfer = True
-                    break
-
-    # 轉接真人時，使用 tool 回傳的格式化文字作為 answer
-    if is_transfer:
+    if "topic_resolved" in state.get("history", []):
         topic_resolved = True
-        for msg in reversed(state.get("messages", [])):
-            if hasattr(msg, "type") and msg.type == "tool" and msg.name == "transfer_to_human":
-                answer = msg.content
-                break
+
+    # 也檢查 tool 呼叫歷史
+    if not topic_resolved:
+        for msg in state.get("messages", []):
+            if hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
+                for tc in msg.tool_calls:
+                    if tc.get("name") == "transfer_to_human":
+                        topic_resolved = True
+                        # 使用 tool 回傳的格式化文字作為 answer
+                        for rmsg in reversed(state.get("messages", [])):
+                            if hasattr(rmsg, "type") and rmsg.type == "tool" and rmsg.name == "transfer_to_human":
+                                answer = rmsg.content
+                                break
+                        break
 
     history_items = ["post_process"]
     if topic_resolved:

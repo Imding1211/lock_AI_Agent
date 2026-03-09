@@ -1,7 +1,7 @@
 import asyncio
 import re
 from langchain_core.tools import StructuredTool
-from core.config import DB_CONFIG, INTENTS_CONFIG, SYSTEM_CONFIG, REQUIRED_SLOTS, USER_PROFILE_CONFIG
+from core.config import DB_CONFIG, SYSTEM_CONFIG, USER_PROFILE_CONFIG
 from retrievers import get_retriever
 from profiles import ProfileManager
 
@@ -82,16 +82,17 @@ def _build_transfer_to_human_tool() -> StructuredTool:
     )
 
 
-def build_tools() -> list:
-    """根據 config.toml 建立所有工具"""
-    tools = []
+def build_tools() -> dict[str, StructuredTool]:
+    """根據 config.toml 建立所有工具，回傳 dict 方便 agent 按名稱取用"""
+    tools = {}
 
     for db_config in DB_CONFIG:
         tool = _build_retriever_tool(db_config)
-        tools.append(tool)
+        tools[tool.name] = tool
         print(f"[*] 已註冊工具: {tool.name} — {db_config.get('description', '')}")
 
-    tools.append(_build_transfer_to_human_tool())
+    transfer_tool = _build_transfer_to_human_tool()
+    tools[transfer_tool.name] = transfer_tool
     print(f"[*] 已註冊工具: transfer_to_human — 轉接真人客服")
 
     return tools

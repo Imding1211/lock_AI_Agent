@@ -17,7 +17,8 @@ def load_config(file_path="config.toml"):
             data.get("line_bot", {"loading_animation_time": 5}),
             data.get("templates", {"push_fallback_prefix": "【系統通知】讓您久等了，以下是您的回覆：\n"}),
             data.get("user_profile", {"enabled": False, "profile_dir": "./user_profiles"}),
-            data.get("debounce", {"enabled": False, "min_wait": 1.5, "max_wait": 5.0, "completeness_threshold": 0.5})
+            data.get("debounce", {"enabled": False, "min_wait": 1.5, "max_wait": 5.0, "completeness_threshold": 0.5}),
+            data.get("agents", [])
         )
 
-DB_CONFIG, LLM_CONFIG, INTENTS_CONFIG, MEMORY_CONFIG, REQUIRED_SLOTS, SYSTEM_CONFIG, LINE_BOT_CONFIG, TEMPLATES_CONFIG, USER_PROFILE_CONFIG, DEBOUNCE_CONFIG = load_config()
+DB_CONFIG, LLM_CONFIG, INTENTS_CONFIG, MEMORY_CONFIG, REQUIRED_SLOTS, SYSTEM_CONFIG, LINE_BOT_CONFIG, TEMPLATES_CONFIG, USER_PROFILE_CONFIG, DEBOUNCE_CONFIG, AGENTS_CONFIG = load_config()
