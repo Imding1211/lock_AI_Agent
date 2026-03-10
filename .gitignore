@@ -27,6 +27,11 @@ env/
 chroma_db_default/
 chroma_db_troubleshoot/
 
+# SQLite 對話記憶（執行時動態產生）
+chat_history.db
+chat_history.db-shm
+chat_history.db-wal
+
 # 使用者輪廓（執行時動態產生）
 user_profiles/
 

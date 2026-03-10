@@ -203,9 +203,11 @@ require_slots = false
 # 對話記憶儲存設定 (Memory / Checkpointer)
 # ==========================================
 [memory]
-type = "memory"  # 目前先用記憶體版，未來可以改成 "sqlite" 或 "postgres"
-# path = "./chat_history.db"  # 未來如果是 sqlite，可以在這裡設定路徑
-topic_shift_detection = true       # 啟用話題轉換偵測（取代 resolution_detection）
+type = "sqlite"
+path = "./chat_history.db"
+topic_shift_detection = true
+max_messages_threshold = 6
+context_retention_pair = 2
 
 
 # ==========================================

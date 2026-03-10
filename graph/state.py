@@ -14,6 +14,7 @@ class GraphState(TypedDict):
     user_profile: Annotated[str, _keep_last]  # 使用者輪廓
     answer: Annotated[str, _keep_last]        # 最終回覆（給 app.py 讀取）
     history: Annotated[list, operator.add]      # 路徑追蹤（除錯用）
+    summary: Annotated[str, _keep_last]           # 對話摘要（記憶體管理用）
     chat_history: Annotated[list, operator.add] # 對話紀錄
     next_agent: Annotated[str, _keep_last]      # router 的決定（向後兼容，取第一個）
     next_agents: Annotated[list, _keep_last]    # 多 agent 派發清單

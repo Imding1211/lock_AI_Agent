@@ -1,4 +1,4 @@
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from core.config import (
     LLM_CONFIG, INTENTS_CONFIG,
@@ -28,15 +28,13 @@ async def pre_process(state: GraphState, config: RunnableConfig):
         else:
             print(f"  [pre_process] {user_id} 尚無歷史輪廓")
 
-    # 建立 messages：歷史對話 + 當前問題
+    # 建立 messages：摘要 + 當前問題
     messages = []
 
-    # 加入歷史對話（來自 chat_history）
-    past_dialogue = state.get("chat_history", [])
-    topic_shift_enabled = MEMORY_CONFIG.get("topic_shift_detection", False)
-    if topic_shift_enabled and past_dialogue:
-        history_text = "\n".join(past_dialogue)
-        messages.append(SystemMessage(content=f"[先前的對話紀錄]\n{history_text}"))
+    # 加入對話摘要（來自 manage_memory 壓縮）
+    summary = state.get("summary", "")
+    if summary:
+        messages.append(SystemMessage(content=f"[前情提要]\n{summary}"))
 
     # 加入當前問題
     messages.append(HumanMessage(content=state["question"]))
@@ -46,6 +44,72 @@ async def pre_process(state: GraphState, config: RunnableConfig):
         "user_profile": user_profile,
         "answer": "",
         "history": ["pre_process"]
+    }
+
+
+async def manage_memory(state: GraphState, config: RunnableConfig):
+    """語意摘要壓縮：當 messages 超過閾值時，用 LLM 摘要舊訊息並刪除"""
+    print("  [manage_memory] 檢查是否需要壓縮記憶...")
+
+    threshold = MEMORY_CONFIG.get("max_messages_threshold", 6)
+    retention_pair = MEMORY_CONFIG.get("context_retention_pair", 1)
+    messages = state.get("messages", [])
+
+    if len(messages) <= threshold:
+        print(f"  [manage_memory] 訊息數 {len(messages)} <= 閾值 {threshold}，跳過壓縮")
+        return {"history": ["manage_memory:skip"]}
+
+    # 計算要保留的最近訊息數量（每對 = 1 human + 1 ai）
+    keep_count = retention_pair * 2
+    messages_to_summarize = messages[:-keep_count] if keep_count > 0 else messages
+    messages_to_keep = messages[-keep_count:] if keep_count > 0 else []
+
+    # 格式化待摘要的訊息
+    dialogue_lines = []
+    for msg in messages_to_summarize:
+        role = getattr(msg, "type", "unknown")
+        content = msg.content if hasattr(msg, "content") else str(msg)
+        if isinstance(content, list):
+            text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+            content = "\n".join(text_parts)
+        if role == "human":
+            dialogue_lines.append(f"使用者: {content}")
+        elif role == "ai" and content:
+            dialogue_lines.append(f"客服: {content}")
+        elif role == "system":
+            dialogue_lines.append(f"系統: {content}")
+
+    if not dialogue_lines:
+        return {"history": ["manage_memory:skip"]}
+
+    dialogue_text = "\n".join(dialogue_lines)
+
+    # 載入摘要 prompt 並呼叫 LLM
+    existing_summary = state.get("summary", "")
+    domain = SYSTEM_CONFIG.get("domain", "電子鎖")
+
+    summarize_prompt = load_prompt_template(
+        "agents/prompts/summarize_messages.md",
+        domain=domain,
+        existing_summary=existing_summary if existing_summary else "(無既有摘要)",
+    )
+
+    response = await llm.ainvoke([
+        SystemMessage(content=summarize_prompt),
+        HumanMessage(content=dialogue_text),
+    ])
+    new_summary = response.content.strip()
+    print(f"  [manage_memory] 已生成摘要 ({len(new_summary)} 字元)")
+
+    # 產生 RemoveMessage 指令，刪除舊訊息
+    remove_messages = [RemoveMessage(id=msg.id) for msg in messages_to_summarize if hasattr(msg, "id") and msg.id]
+
+    print(f"  [manage_memory] 刪除 {len(remove_messages)} 條舊訊息，保留 {len(messages_to_keep)} 條")
+
+    return {
+        "summary": new_summary,
+        "messages": remove_messages,
+        "history": ["manage_memory:summarized"],
     }
 
 
@@ -142,21 +206,22 @@ async def handle_transfer_human(state: GraphState, config: RunnableConfig):
     user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
 
     user_profile = await profile_manager.load_profile(user_id)
+    current_question = state.get("question", "")
+    combined_text = f"{user_profile}\n{current_question}"
 
     import re
     phone = ""
     address = ""
     brand_model = ""
-    if user_profile:
-        phone_match = re.search(r'09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}', user_profile)
-        if phone_match:
-            phone = phone_match.group()
-        addr_match = re.search(
-            r'[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[\u4e00-\u9fff\d\s\-]*(?:路|街|巷|弄|號|樓)[\u4e00-\u9fff\d\s\-]*',
-            user_profile
-        )
-        if addr_match:
-            address = addr_match.group().strip()
+    phone_match = re.search(r'09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}', combined_text)
+    if phone_match:
+        phone = phone_match.group()
+    addr_match = re.search(
+        r'[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[\u4e00-\u9fff\d\s\-]*(?:路|街|巷|弄|號|樓)[\u4e00-\u9fff\d\s\-]*',
+        combined_text
+    )
+    if addr_match:
+        address = addr_match.group().strip()
 
     has_info = any([brand_model, phone, address])
     if has_info:
@@ -205,9 +270,9 @@ async def merge_answers(state: GraphState):
                         answer = str(content).strip()
                     break
         else:
-            # 多 agent：收集所有 final AI messages（非 tool_call），用 LLM 合併
+            # 多 agent：從尾端收集最近 N 個 AI messages（非 tool_call），避免舊保留訊息混入
             ai_answers = []
-            for msg in state.get("messages", []):
+            for msg in reversed(state.get("messages", [])):
                 if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
                     content = msg.content
                     if isinstance(content, list):
@@ -217,6 +282,9 @@ async def merge_answers(state: GraphState):
                         text = str(content).strip()
                     if text:
                         ai_answers.append(text)
+                    if len(ai_answers) >= num_agents:
+                        break
+            ai_answers.reverse()
 
             if len(ai_answers) <= 1:
                 answer = ai_answers[0] if ai_answers else ""

@@ -21,7 +21,7 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from core.config import LINE_BOT_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG
 
-from graph.builder import app as langgraph_app
+from graph.builder import build_graph
 
 # 載入環境變數 (.env)
 load_dotenv()
@@ -44,16 +44,14 @@ LANGGRAPH_TIMEOUT = 60
 BUFFER_TTL_SECONDS = 300
 BUFFER_CLEANUP_INTERVAL = 60
 
-# 使用者 session 計數器：話題結束後遞增，產生新的 thread_id
-user_sessions = {}  # {user_id: session_counter}
+# LangGraph app（在 startup 事件中非同步初始化）
+langgraph_app = None
 
 async def run_langgraph(user_id: str, user_text: str) -> tuple[str, list]:
     """將使用者訊息送入 LangGraph，並利用 user_id 維持對話記憶"""
     try:
-        # 1. 設定對話的 Thread ID，讓 MemorySaver 知道這是哪位使用者的歷史紀錄
-        #    thread_id 加上 session 後綴，話題結束後遞增以獲得乾淨的 chat_history
-        session_id = user_sessions.get(user_id, 0)
-        thread_id = f"{user_id}_{session_id}"
+        # 1. 設定對話的 Thread ID（固定格式，SQLite 持久化）
+        thread_id = f"smart_lock_{user_id}"
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -134,8 +132,7 @@ async def process_and_reply(user_id: str, reply_token: str):
         combined_text = "\n".join(user_buffers[user_id]["text"])
         _, topic_resolved = await langgraph_and_reply(user_id, reply_token, combined_text)
         if topic_resolved:
-            user_sessions[user_id] = user_sessions.get(user_id, 0) + 1
-            print(f"  [Session] {user_id} 話題已結束，session 遞增為 {user_sessions[user_id]}")
+            print(f"  [Session] {user_id} 話題已結束")
 
     except asyncio.CancelledError:
         print(f" ⏳ [任務取消] {user_id} 仍在輸入，更新計時器...")
@@ -165,6 +162,8 @@ async def cleanup_stale_buffers():
 
 @app.on_event("startup")
 async def startup_event():
+    global langgraph_app
+    langgraph_app = await build_graph()
     asyncio.create_task(cleanup_stale_buffers())
 
 @app.post("/webhook")

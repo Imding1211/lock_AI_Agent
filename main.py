@@ -1,4 +1,5 @@
 # main.py
+import os
 import logging
 import warnings
 import asyncio
@@ -6,18 +7,16 @@ import asyncio
 logging.getLogger("curl_cffi").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", message="Your application has authenticated using end user credentials")
 
-from graph.builder import app
+from graph.builder import build_graph
+from memory import close_checkpointer
+
 
 def _is_agent_step(item):
-    """判斷 history item 是否為 agent 子圖步驟（格式：agent_name:agent_llm / agent_name:tool_node）"""
     parts = item.split(":", 1)
     return len(parts) == 2 and parts[1] in ("agent_llm", "tool_node")
 
 
 def format_history_tree(history):
-    """將扁平的 history list 轉成樹狀圖，自動去除子圖合併造成的重複"""
-
-    # 1. 去重：主圖步驟只保留首次出現，agent 子步驟允許重複（LLM 可能多輪思考）
     seen = set()
     steps = []
     for item in history:
@@ -26,8 +25,7 @@ def format_history_tree(history):
             if not _is_agent_step(item):
                 seen.add(item)
 
-    # 2. 分組：將連續的 agent 子步驟收為一組
-    blocks = []  # [(type, name, sub_steps | None)]
+    blocks = []
     i = 0
     while i < len(steps):
         item = steps[i]
@@ -39,7 +37,12 @@ def format_history_tree(history):
                 i += 1
             blocks.append(("agent", agent, subs))
         elif item.startswith("router:"):
-            blocks.append(("router", item.split(":", 1)[1], None))
+            router_label = item.split(":", 1)[1]
+            if not blocks or blocks[-1][0] != "router" or blocks[-1][1] != router_label:
+                blocks.append(("router", router_label, None))
+            i += 1
+        elif item.startswith("manage_memory:"):
+            blocks.append(("memory", item.split(":", 1)[1], None))
             i += 1
         elif item == "topic_resolved":
             blocks.append(("flag", item, None))
@@ -48,7 +51,6 @@ def format_history_tree(history):
             blocks.append(("node", item, None))
             i += 1
 
-    # 3. 繪製樹狀圖
     lines = []
     for idx, (btype, name, subs) in enumerate(blocks):
         is_last = idx == len(blocks) - 1
@@ -62,6 +64,8 @@ def format_history_tree(history):
                 lines.append(f"{indent}{sub_branch}{sub}")
         elif btype == "router":
             lines.append(f"{branch}router → {name}")
+        elif btype == "memory":
+            lines.append(f"{branch}manage_memory → {name}")
         elif btype == "flag":
             lines.append(f"{branch}[FLAG] {name}")
         else:
@@ -70,9 +74,8 @@ def format_history_tree(history):
     return "\n".join(lines)
 
 
-async def run_test(query, thread_id="user_123"):
-    print(f"\n======================================")
-    print(f">>> [{thread_id}] 測試問題: {query}")
+async def run_test(app, query, thread_id="user_123", show_memory=False):
+    print(f"\n>>> [{thread_id}] {query}")
 
     inputs = {"question": query}
     config = {"configurable": {"thread_id": thread_id, "user_id": thread_id}}
@@ -83,86 +86,68 @@ async def run_test(query, thread_id="user_123"):
     final = await app.ainvoke(inputs, config=config)
 
     current_history = final["history"][prev_len:]
-    print(f"*** 最終結果 ***\n{final['answer']}")
-    print(f"[路徑追蹤]\n{format_history_tree(current_history)}")
-    print(f"======================================\n")
+    print(f"[回覆] {final['answer']}")
+    print(f"[路徑]\n{format_history_tree(current_history)}")
+
+    if show_memory:
+        state = await app.aget_state(config)
+        vals = state.values or {}
+        msgs = vals.get("messages", [])
+        summary = vals.get("summary", "")
+        print(f"[記憶] messages={len(msgs)}, summary={len(summary)}字")
+        if summary:
+            print(f"[摘要] {summary}")
+
+    print()
+
 
 if __name__ == "__main__":
     async def main():
-        print("\n" + "="*50)
-        print("系統功能展示（多 Agent 平行派發 + 劇本精簡）")
-        print("="*50)
-        
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 1】一般產品問題")
-        print("展示重點：Router 分類到 product_expert，Agent 使用手冊資料庫檢索。")
-        # ---------------------------------------------------------
-        await run_test("門鎖的指紋要怎麼設定？", thread_id="demo_1")
-        
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 2】對話記憶與追問")
-        print("展示重點：跨回合記憶、Agent 主動追問設備資訊，使用者一次提供。")
-        # ---------------------------------------------------------
-        await run_test("一直設定失敗怎麼辦？我是 Philips 的 Alpha", thread_id="demo_1")
+        app = await build_graph()
+        T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
 
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 3】模糊訊息 — Agent 主動追問")
-        print("展示重點：不完整的訊息由 Agent 透過 prompt 自行判斷並追問。")
-        # ---------------------------------------------------------
-        await run_test("壞了", thread_id="demo_2")
+        # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
+        await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
 
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 4】領域外問題 — LLM 生成拒絕")
-        print("展示重點：out_of_domain 由 LLM 動態生成禮貌拒絕（非罐頭訊息）。")
-        # ---------------------------------------------------------
-        await run_test("今天台北天氣如何？", thread_id="demo_3")
+        # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
+        await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
 
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 5】訂單查詢（API 工具）")
-        print("展示重點：Router 分類到 order_clerk，Agent 自動使用 API 工具查詢。")
-        # ---------------------------------------------------------
-        await run_test("幫我查一下訂單 ORD-20260301 的出貨進度", thread_id="demo_4")
-        
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 6】網頁搜尋")
-        print("展示重點：Router 分類到 web_researcher，Agent 使用網頁搜尋工具。")
-        # ---------------------------------------------------------
-        await run_test("市面上有哪些支援 Apple HomeKey 的電子鎖推薦？", thread_id="demo_5")
-        
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 7】使用者輪廓建立 + 跨 Session 記憶")
-        print("展示重點：從對話中萃取個人資訊存入輪廓，下一輪不提品牌型號仍能個人化回覆。")
-        # ---------------------------------------------------------
-        await run_test("我住在公寓大樓，用的是 Samsung SHP-DP609 指紋鎖，最近指紋辨識很不靈敏", thread_id="demo_6")
-        await run_test("電池快沒電的時候會有什麼提示嗎？", thread_id="demo_6")
-        
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 8】轉接真人客服 + 輪廓帶入")
-        print("展示重點：使用者提供個資後要求轉接，自動帶入已知資訊。")
-        # ---------------------------------------------------------
-        await run_test("我住在台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，門鎖打不開", thread_id="demo_7")
-        await run_test("沒辦法解決，幫我轉接真人客服", thread_id="demo_7")
-        
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 9】多意圖平行派發（故障排除 + 訂單查詢）")
-        print("展示重點：Send() 平行派發 troubleshooter + order_clerk，合併回覆。")
-        # ---------------------------------------------------------
-        await run_test(
-            "你好，我上週買了一台 Philips Alpha 電子鎖，安裝師傅裝好之後指紋一直設定不成功，"
-            "我試了很多次都沒辦法，而且我還想順便問一下我的訂單 ORD-20260301 到底出貨了沒有，"
-            "如果還是不行的話我可能要請你們派人來看一下",
-            thread_id="demo_8"
+        # --- 第 3 輪：追問 → troubleshooter（預期觸發 manage_memory:summarized）---
+        await run_test(app, "清潔過感應區了還是一樣", thread_id=T, show_memory=True)
+
+        # --- 第 4 輪：換話題 → product_expert（驗證摘要注入 [前情提要]）---
+        await run_test(app, "電池快沒電會有什麼提示嗎？", thread_id=T, show_memory=True)
+
+        # --- 領域外問題 → out_of_domain ---
+        await run_test(app, "今天台北天氣如何？", thread_id="demo_ood")
+
+        # --- 多意圖平行派發 → order_clerk + web_researcher ---
+        await run_test(app,
+            "幫我查訂單 ORD-20260301 的進度，另外有推薦支援 HomeKey 的電子鎖嗎？",
+            thread_id="demo_multi"
         )
 
-        # ---------------------------------------------------------
-        print("\n\n-- 【劇本 10】多意圖平行派發（訂單查詢 + 故障排除）")
-        print("展示重點：order_clerk + troubleshooter/product_expert 平行執行。")
-        # ---------------------------------------------------------
-        await run_test(
-            "我之前訂了兩台電子鎖，一台是給我家大門用的，另一台是要裝在辦公室，"
-            "但是到現在只收到一台，訂單編號是 ORD-20260215，麻煩幫我查一下另一台的出貨進度，"
-            "另外那台已經裝好的有時候會發出嗶嗶聲不知道是什麼意思",
-            thread_id="demo_9"
+        # --- 轉接真人 → transfer_human（帶入輪廓資訊）---
+        await run_test(app,
+            "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
+            thread_id="demo_human"
         )
-        
+
+        # --- SQLite 持久化驗證 ---
+        print("=" * 40)
+        db_path = "./chat_history.db"
+        if os.path.exists(db_path):
+            print(f"[SQLite] {db_path} = {os.path.getsize(db_path):,} bytes")
+
+        config = {"configurable": {"thread_id": T, "user_id": T}}
+        state = await app.aget_state(config)
+        if state.values:
+            msgs = state.values.get("messages", [])
+            summary = state.values.get("summary", "")
+            print(f"[最終] thread={T}, messages={len(msgs)}, summary={len(summary)}字")
+            if summary:
+                print(f"[摘要] {summary}")
+
+        await close_checkpointer()
+
     asyncio.run(main())

@@ -8,7 +8,9 @@ duckduckgo-search
 python-dotenv
 line-bot-sdk
 langgraph
+langgraph-checkpoint-sqlite
 requests
 fastapi
 uvicorn
 ddgs
+aiosqlite

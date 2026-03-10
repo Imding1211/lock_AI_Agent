@@ -3,7 +3,7 @@ from langgraph.types import Send
 from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from graph.state import GraphState
 from graph.nodes import (
-    pre_process, router, handle_out_of_domain,
+    pre_process, manage_memory, router, handle_out_of_domain,
     handle_transfer_human, merge_answers, update_profile, post_process,
     llm as base_llm
 )
@@ -12,7 +12,7 @@ from tools import build_tools
 from agents import build_all_agents
 
 
-def build_graph():
+async def build_graph():
     # 建立工具 dict 與 agent 子圖
     tools_dict = build_tools()
     agent_subgraphs = build_all_agents(AGENTS_CONFIG, tools_dict, base_llm)
@@ -21,25 +21,39 @@ def build_graph():
     def route_by_intent(state: GraphState):
         agents = state.get("next_agents", [])
 
+        # 只保留 summary (SystemMessage) + 當前問題 (最後一個 HumanMessage)
+        # 避免舊對話的 AI 回覆影響 agent 決策 & merge_answers 計數
+        agent_msgs = []
+        for msg in state.get("messages", []):
+            if hasattr(msg, "type") and msg.type == "system":
+                agent_msgs.append(msg)
+        for msg in reversed(state.get("messages", [])):
+            if hasattr(msg, "type") and msg.type == "human":
+                agent_msgs.append(msg)
+                break
+
+        clean = {**state, "history": [], "messages": agent_msgs}
+
         if not agents:
-            return [Send("out_of_domain", state)]
+            return [Send("out_of_domain", clean)]
         if agents == ["out_of_domain"]:
-            return [Send("out_of_domain", state)]
+            return [Send("out_of_domain", clean)]
         if agents == ["human"]:
-            return [Send("human", state)]
+            return [Send("human", clean)]
 
         # 過濾出有效的 agent，無效的跳過
         valid = [a for a in agents if a in agent_subgraphs]
         if not valid:
-            return [Send("out_of_domain", state)]
+            return [Send("out_of_domain", clean)]
 
-        return [Send(a, state) for a in valid]
+        return [Send(a, clean) for a in valid]
 
     # 組裝 StateGraph
     workflow = StateGraph(GraphState)
 
     # 節點
     workflow.add_node("pre_process", pre_process)
+    workflow.add_node("manage_memory", manage_memory)
     workflow.add_node("router", router)
     workflow.add_node("out_of_domain", handle_out_of_domain)
     workflow.add_node("human", handle_transfer_human)
@@ -52,7 +66,8 @@ def build_graph():
 
     # 連線
     workflow.add_edge(START, "pre_process")
-    workflow.add_edge("pre_process", "router")
+    workflow.add_edge("pre_process", "manage_memory")
+    workflow.add_edge("manage_memory", "router")
 
     # router → 各 agent / out_of_domain / human（透過 Send() fan-out）
     workflow.add_conditional_edges("router", route_by_intent)
@@ -71,9 +86,6 @@ def build_graph():
     workflow.add_edge("post_process", END)
 
     # Checkpointer
-    memory = get_checkpointer(MEMORY_CONFIG)
+    memory = await get_checkpointer(MEMORY_CONFIG)
 
     return workflow.compile(checkpointer=memory)
-
-
-app = build_graph()
