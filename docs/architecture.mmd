@@ -1,14 +1,25 @@
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4A90D9', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2E6CB5', 'lineColor': '#5C6BC0', 'secondaryColor': '#E8F5E9', 'tertiaryColor': '#FFF3E0'}}}%%
 
 graph TD
-    START((START))
-    END_NODE((END))
+    LINE_USER(("LINE 使用者"))
 
-    subgraph main_graph ["主圖（Supervisor Graph）"]
+    subgraph debounce_layer ["防抖層（app.py）"]
+        direction TB
+        webhook["webhook<br/><small>接收 LINE 訊息<br/>顯示 Loading 動畫</small>"]
+        buffer["訊息緩衝池<br/><small>累積多則訊息<br/>取消/重設計時器</small>"]
+        debounce_eval["防抖評估<br/><small>規則式 6 條 + LLM 評分<br/>completeness score</small>"]
+        clarification["反問使用者<br/><small>訊息不完整時<br/>請求補充資訊</small>"]
+        webhook --> buffer
+        buffer -->|"min_wait 到期"| debounce_eval
+        debounce_eval -->|"score < 門檻"| clarification
+        clarification -.->|"使用者補充"| buffer
+    end
+
+    subgraph supervisor_graph ["Supervisor Graph（LangGraph + MemorySaver）"]
         pre_process["pre_process<br/><small>載入 user profile<br/>組裝 messages</small>"]
         router["router<br/><small>LLM 意圖分類<br/>→ next_agent</small>"]
         check_result["check_result<br/><small>評估回覆品質<br/>決定 fallback</small>"]
-        post_process["post_process<br/><small>提取 answer<br/>更新 user profile<br/>記錄 chat_history</small>"]
+        post_process["post_process<br/><small>提取 answer<br/>更新 user profile<br/>話題偵測 → session 遞增</small>"]
         out_of_domain["out_of_domain<br/><small>禮貌拒絕<br/>非業務問題</small>"]
         human["transfer_human<br/><small>轉接真人客服<br/>帶入已知個資</small>"]
     end
@@ -45,8 +56,26 @@ graph TD
         WR_TOOL -->|tool results| WR_LLM
     end
 
+    subgraph data_stores ["外部資料源"]
+        direction LR
+        chroma_manual[("Chroma DB<br/><small>產品手冊</small>")]
+        chroma_trouble[("Chroma DB<br/><small>故障排除</small>")]
+        order_api[("Order API<br/><small>訂單 / 維修單</small>")]
+        duckduckgo[("DuckDuckGo<br/><small>網頁搜尋</small>")]
+    end
+
+    subgraph persistence ["持久化儲存"]
+        direction LR
+        profile_store[("User Profiles<br/><small>./user_profiles/*.md</small>")]
+    end
+
+    LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
+
+    %% LINE → Debounce → LangGraph
+    LINE_USER -->|"傳送訊息"| webhook
+    debounce_eval -->|"score >= 門檻"| pre_process
+
     %% Main flow
-    START --> pre_process
     pre_process --> router
 
     %% Router conditional edges
@@ -71,21 +100,49 @@ graph TD
     %% Terminal edges
     out_of_domain --> post_process
     human --> post_process
-    post_process --> END_NODE
+    post_process -->|"Reply / Push API"| LINE_USER
+
+    %% Tool → Data Store connections
+    PE_TOOL --- chroma_manual
+    TS_TOOL --- chroma_trouble
+    OC_TOOL --- order_api
+    WR_TOOL --- duckduckgo
+
+    %% User Profile persistence
+    pre_process -.->|"載入"| profile_store
+    post_process -.->|"儲存"| profile_store
+
+    %% LLM connections
+    LLM_ENGINE -..- debounce_eval
+    LLM_ENGINE -..- router
+    LLM_ENGINE -..- PE_LLM
+    LLM_ENGINE -..- TS_LLM
+    LLM_ENGINE -..- OC_LLM
+    LLM_ENGINE -..- WR_LLM
 
     %% Styling
-    classDef startEnd fill:#78909C,stroke:#546E7A,color:#fff,stroke-width:2px
+    classDef userNode fill:#1B5E20,stroke:#0D3B11,color:#fff,stroke-width:2px
+    classDef debounce fill:#FF6F00,stroke:#E65100,color:#fff,stroke-width:1px
+    classDef clarify fill:#F9A825,stroke:#F57F17,color:#333,stroke-width:1px
     classDef process fill:#4A90D9,stroke:#2E6CB5,color:#fff,stroke-width:1px
     classDef router_style fill:#FF8F00,stroke:#E65100,color:#fff,stroke-width:2px
     classDef check_style fill:#7B1FA2,stroke:#4A148C,color:#fff,stroke-width:2px
     classDef special fill:#E53935,stroke:#B71C1C,color:#fff,stroke-width:1px
     classDef agent_llm fill:#43A047,stroke:#2E7D32,color:#fff,stroke-width:1px
     classDef agent_tool fill:#26A69A,stroke:#00897B,color:#fff,stroke-width:1px
+    classDef datastore fill:#5D4037,stroke:#3E2723,color:#fff,stroke-width:1px
+    classDef persist fill:#37474F,stroke:#263238,color:#fff,stroke-width:1px
+    classDef llm_style fill:#1565C0,stroke:#0D47A1,color:#fff,stroke-width:2px
 
-    class START,END_NODE startEnd
+    class LINE_USER userNode
+    class webhook,buffer,debounce_eval debounce
+    class clarification clarify
     class pre_process,post_process process
     class router router_style
     class check_result check_style
     class out_of_domain,human special
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
+    class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
+    class profile_store persist
+    class LLM_ENGINE llm_style
