@@ -1,8 +1,7 @@
-import re
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from core.config import (
-    LLM_CONFIG, INTENTS_CONFIG, REQUIRED_SLOTS,
+    LLM_CONFIG, INTENTS_CONFIG,
     SYSTEM_CONFIG, USER_PROFILE_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 )
 from profiles import ProfileManager
@@ -45,6 +44,7 @@ async def pre_process(state: GraphState, config: RunnableConfig):
     return {
         "messages": messages,
         "user_profile": user_profile,
+        "answer": "",
         "history": ["pre_process"]
     }
 
@@ -54,7 +54,6 @@ async def router(state: GraphState, config: RunnableConfig):
     print("  [router] 正在分類意圖...")
 
     domain = SYSTEM_CONFIG.get("domain", "電子鎖")
-    tried_agents = state.get("tried_agents", [])
 
     # 建構意圖選項清單
     intent_lines = []
@@ -65,25 +64,11 @@ async def router(state: GraphState, config: RunnableConfig):
         intent_lines.append(f'- "{name}": {label} — {desc}')
     intent_list = "\n".join(intent_lines)
 
-    # 建構已嘗試 agent 的提示
-    tried_agents_section = ""
-    if tried_agents:
-        # 找到 tried_agents 對應的 intent targets
-        agent_to_intents = {}
-        for intent in INTENTS_CONFIG:
-            target = intent.get("target", "")
-            if target in tried_agents:
-                agent_to_intents.setdefault(target, []).append(intent["name"])
-        avoided = ", ".join([f'"{i}"' for intents in agent_to_intents.values() for i in intents])
-        if avoided:
-            tried_agents_section = f"\n6. The following intents have already been tried and failed: {avoided}. Choose a DIFFERENT intent."
-
     # 載入 router prompt
     router_prompt = load_prompt_template(
         "agents/prompts/router.md",
         domain=domain,
         intent_list=intent_list,
-        tried_agents_section=tried_agents_section,
     )
 
     # 取得使用者問題（從 messages 中找最後一個 HumanMessage）
@@ -121,12 +106,14 @@ async def router(state: GraphState, config: RunnableConfig):
 
 
 async def handle_out_of_domain(state: GraphState):
-    """禮貌拒絕非業務問題"""
-    print("  [out_of_domain] 禮貌拒絕...")
+    """用 LLM 禮貌拒絕非業務問題"""
+    print("  [out_of_domain] 用 LLM 生成禮貌拒絕...")
     domain = SYSTEM_CONFIG.get("domain", "電子鎖")
-    answer = f"不好意思，我是「{domain}」的專屬客服助理，這個問題不在我的服務範圍內。如果您有任何關於{domain}的問題，我很樂意為您服務！"
+    question = state.get("question", "")
+    prompt = f"你是「{domain}」專屬客服。使用者問了與服務範圍無關的問題：「{question}」。請用繁體中文禮貌拒絕並引導詢問{domain}相關問題。語氣親切簡潔。"
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
     return {
-        "answer": answer,
+        "answer": response.content.strip(),
         "history": ["out_of_domain"]
     }
 
@@ -139,6 +126,7 @@ async def handle_transfer_human(state: GraphState, config: RunnableConfig):
 
     user_profile = await profile_manager.load_profile(user_id)
 
+    import re
     phone = ""
     address = ""
     brand_model = ""
@@ -174,62 +162,6 @@ async def handle_transfer_human(state: GraphState, config: RunnableConfig):
     }
 
 
-async def check_agent_result(state: GraphState):
-    """檢查 agent 回覆是否充足，決定繼續或 fallback"""
-    print("  [check_result] 正在評估回覆品質...")
-
-    # 從 messages 取得最後一個 AI text message
-    answer_text = ""
-    for msg in reversed(state.get("messages", [])):
-        if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
-            content = msg.content
-            if isinstance(content, list):
-                text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
-                answer_text = "\n".join(text_parts).strip()
-            else:
-                answer_text = str(content).strip()
-            break
-
-    # 檢查是否有 transfer_to_human 工具呼叫
-    for msg in state.get("messages", []):
-        if hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
-            for tc in msg.tool_calls:
-                if tc.get("name") == "transfer_to_human":
-                    print("  [check_result] 偵測到轉接真人，標記為充足")
-                    return {"history": ["check_result:sufficient"]}
-
-    # 用 LLM 評估回覆是否充足
-    insufficient_indicators = [
-        "無法找到", "找不到相關", "沒有找到", "無法提供",
-        "不足以回答", "沒有相關資料", "無相關資料",
-    ]
-    is_insufficient = any(indicator in answer_text for indicator in insufficient_indicators)
-
-    if is_insufficient:
-        tried = state.get("tried_agents", [])
-        current_agent = state.get("next_agent", "")
-        all_agents = {a["name"] for a in AGENTS_CONFIG}
-        remaining = all_agents - set(tried) - {current_agent}
-
-        if remaining:
-            print(f"  [check_result] 回覆不足，嘗試 fallback（剩餘: {remaining}）")
-            return {
-                "next_agent": "__fallback__",
-                "tried_agents": [current_agent],
-                "history": ["check_result:fallback"]
-            }
-        else:
-            print("  [check_result] 所有 agent 已嘗試，轉接真人")
-            return {
-                "next_agent": "__transfer_human__",
-                "tried_agents": [current_agent],
-                "history": ["check_result:all_exhausted"]
-            }
-
-    print("  [check_result] 回覆充足")
-    return {"history": ["check_result:sufficient"]}
-
-
 async def post_process(state: GraphState, config: RunnableConfig):
     """從 agent 最終回覆提取 answer、更新 user profile"""
     print("  [post_process] 正在提取最終回覆並更新輪廓...")
@@ -254,9 +186,9 @@ async def post_process(state: GraphState, config: RunnableConfig):
     if not answer:
         answer = "抱歉，系統沒有產生回覆。"
 
-    print(f"  [post_process] 最終回覆: {answer[:80]}...")
+    print(f"  [post_process] 最終回覆: {answer[:10]}...")
 
-    # 判斷是否為轉接真人（檢查 history）
+    # 判斷是否為轉接真人（檢查 history 和 tool 呼叫）
     topic_resolved = False
     if "topic_resolved" in state.get("history", []):
         topic_resolved = True
@@ -286,7 +218,6 @@ async def post_process(state: GraphState, config: RunnableConfig):
         existing_profile = state.get("user_profile", "")
         question = state.get("question", "")
 
-        update_llm = get_llm(LLM_CONFIG)
         prompt = f"""
     You are a user profile manager for a smart lock customer service system.
     Your task is to analyze the conversation and update the user's profile with any new personal information.
@@ -319,7 +250,7 @@ async def post_process(state: GraphState, config: RunnableConfig):
     """
 
         try:
-            response = await update_llm.ainvoke(prompt)
+            response = await llm.ainvoke(prompt)
             updated = response.content.strip()
             if updated and len(updated) >= 10:
                 await profile_manager.save_profile(user_id, updated)

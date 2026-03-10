@@ -27,9 +27,6 @@ python build_troubleshoot_db.py  # -> ./chroma_db_troubleshoot
 
 # Run mock order API server (for testing db_order_api retriever)
 uvicorn mock_api:app --port 8001
-
-# Run debounce tests
-python -m pytest tests/test_debounce.py
 ```
 
 ## Architecture
@@ -39,27 +36,22 @@ python -m pytest tests/test_debounce.py
 The core is a **StateGraph** compiled in `graph/builder.py`. The flow:
 
 ```
-START -> load_user_profile -> rewrite_query -> detect_intent -> extract_slots
-  -> (conditional) ask_missing_slots -> END  (if required slots missing)
-  -> (conditional) [retriever node] -> (grader) -> generate -> update_user_profile -> END
-  -> (conditional) human -> END  (transfer to human agent)
+START → pre_process → router → {agents | out_of_domain | human} → post_process → END
 ```
 
 - **`state.py`** — `GraphState` TypedDict with `history` and `chat_history` as append-only (`Annotated[list, operator.add]`) fields
-- **`nodes.py`** — All LangGraph node functions: `load_user_profile`, `rewrite_query`, `detect_intent`, `extract_slots`, `ask_missing_slots`, `create_retrieve_node`, `generate_answer`, `transfer_to_human`, `decide_sufficiency`, `update_user_profile`
-- **`builder.py`** — Wires nodes and conditional edges; dynamically creates retriever nodes from `config.toml` `[[databases]]` entries
+- **`nodes.py`** — All LangGraph node functions: `pre_process`, `router`, `handle_out_of_domain`, `handle_transfer_human`, `post_process`
+- **`builder.py`** — Wires nodes and conditional edges; dynamically creates agent subgraphs from `config.toml` `[[agents]]` entries
 
-### Retrieval Fallback Chain
+### Multi-Agent Architecture
 
-Retriever nodes are tried in `[[databases]]` array order from `config.toml`. After each retriever, `decide_sufficiency` (LLM grader) checks both domain relevance and answer quality. If insufficient, falls through to the next retriever. Final fallback is `transfer_to_human`.
-
-Chain: Chroma (manual) -> Chroma (troubleshoot) -> API -> Web Search -> Human
+Each agent is a LLM+Tools subgraph with its own prompt and tool set. The router classifies user intent and dispatches to the appropriate agent. Each agent has access to `transfer_to_human` tool for self-escalation when it cannot answer.
 
 ### Configuration-Driven Design (`config.toml`)
 
 Nearly everything is configured via `config.toml`, parsed by `core/config.py`:
 - **`[system]`** — Domain definition for the chatbot
-- **`[debounce]`** — Message buffering settings (wait time, completeness threshold)
+- **`[debounce]`** — Message buffering settings (`buffer_wait` seconds)
 - **`[llm]`** — Provider (`ollama`/`gemini`), model name, temperature
 - **`[[databases]]`** — Ordered retriever definitions (type: `chroma`, `api`, `web_search`)
 - **`[[intents]]`** — Intent routing rules mapping intent names to target retriever nodes
@@ -81,10 +73,6 @@ Registries:
 - **`llms/__init__.py`** — `LLM_REGISTRY` maps provider strings to builder functions
 - **`embeddings/__init__.py`** — `REGISTRY` maps embedding provider strings to builder functions
 
-### Message Debouncing (`core/debounce.py`)
-
-Intelligent message completeness evaluation using rule-based heuristics (6 rules) combined with LLM assessment. Determines whether a user's buffered messages form a complete query or if more input should be awaited. Configurable via `[debounce]` in `config.toml`.
-
 ### User Profile Management (`profiles/`, `memory/`)
 
 - **`profiles/manager.py`** — Persists user conversation state to `user_profiles/` directory
@@ -92,7 +80,7 @@ Intelligent message completeness evaluation using rule-based heuristics (6 rules
 
 ### LINE Bot Integration (`app.py`)
 
-FastAPI webhook at `/webhook`. Implements **message debouncing** — buffers rapid messages per user, waits `debounce_wait_time` seconds, then merges and processes. Uses Reply API first, falls back to Push API if the reply token expires.
+FastAPI webhook at `/webhook`. Implements simple **message buffering** — buffers rapid messages per user, waits `buffer_wait` seconds (new messages reset the timer), then merges and sends to LangGraph. Uses Reply API first, falls back to Push API if the reply token expires.
 
 ## Key Conventions
 

@@ -3,7 +3,7 @@ from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from graph.state import GraphState
 from graph.nodes import (
     pre_process, router, handle_out_of_domain,
-    handle_transfer_human, check_agent_result, post_process,
+    handle_transfer_human, post_process,
     llm as base_llm
 )
 from memory import get_checkpointer
@@ -28,15 +28,6 @@ def build_graph():
         # fallback 到第一個 agent
         return list(agent_subgraphs.keys())[0] if agent_subgraphs else "out_of_domain"
 
-    # check_result 路由：充足 → post_process，fallback → router，全部耗盡 → human
-    def route_after_check(state: GraphState):
-        next_agent = state.get("next_agent", "")
-        if next_agent == "__fallback__":
-            return "router"
-        if next_agent == "__transfer_human__":
-            return "human"
-        return "post_process"
-
     # 組裝 StateGraph
     workflow = StateGraph(GraphState)
 
@@ -45,7 +36,6 @@ def build_graph():
     workflow.add_node("router", router)
     workflow.add_node("out_of_domain", handle_out_of_domain)
     workflow.add_node("human", handle_transfer_human)
-    workflow.add_node("check_result", check_agent_result)
     workflow.add_node("post_process", post_process)
 
     for name, subgraph in agent_subgraphs.items():
@@ -61,16 +51,9 @@ def build_graph():
     route_map["human"] = "human"
     workflow.add_conditional_edges("router", route_by_intent, route_map)
 
-    # 各 agent → check_result
+    # 各 agent → post_process（直接連接，不經 check_result）
     for name in agent_subgraphs:
-        workflow.add_edge(name, "check_result")
-
-    # check_result → post_process / router / human
-    workflow.add_conditional_edges(
-        "check_result",
-        route_after_check,
-        {"post_process": "post_process", "router": "router", "human": "human"}
-    )
+        workflow.add_edge(name, "post_process")
 
     # out_of_domain → post_process
     workflow.add_edge("out_of_domain", "post_process")

@@ -35,6 +35,26 @@ MOCK_ORDERS = {
         "estimated_delivery": "已送達",
         "note": "已於 3/22 簽收完成"
     },
+    "ORD-20260301": {
+        "order_id": "ORD-20260301",
+        "customer": "測試用戶",
+        "product": "Philips Alpha 指紋電子鎖",
+        "status": "已出貨",
+        "logistics": "黑貓宅急便",
+        "tracking_no": "TC-20260302-001",
+        "estimated_delivery": "2026 年 3 月 4 日下午",
+        "note": "商品已於 3/2 從台北倉庫出貨"
+    },
+    "ORD-20260215": {
+        "order_id": "ORD-20260215",
+        "customer": "測試用戶",
+        "product": "Samsung SHP-DP609 推拉式電子鎖 x2",
+        "status": "部分出貨",
+        "logistics": "新竹物流",
+        "tracking_no": "HCT-20260220-088",
+        "estimated_delivery": "第一台已送達；第二台預計 3~5 個工作天內出貨",
+        "note": "第一台已於 2/20 簽收完成，第二台備貨中預計近日出貨"
+    },
 }
 
 # 模擬維修單資料庫
@@ -76,7 +96,9 @@ def search_orders(keyword: str) -> str:
     """搜尋訂單"""
     results = []
     for order_id, order in MOCK_ORDERS.items():
-        if keyword in order_id or keyword in order["customer"] or keyword in order["product"]:
+        if (keyword in order_id or order_id in keyword
+                or keyword in order["customer"] or order["customer"] in keyword
+                or keyword in order["product"] or order["product"] in keyword):
             if order["status"] == "已出貨":
                 results.append(
                     f"訂單編號：{order['order_id']}\n"
@@ -86,11 +108,12 @@ def search_orders(keyword: str) -> str:
                     f"預計到貨：{order['estimated_delivery']}\n"
                     f"備註：{order['note']}"
                 )
-            elif order["status"] == "處理中":
+            elif order["status"] in ("處理中", "部分出貨"):
                 results.append(
                     f"訂單編號：{order['order_id']}\n"
                     f"商品：{order['product']}\n"
                     f"狀態：{order['status']}\n"
+                    f"物流：{order['logistics']}（追蹤碼：{order['tracking_no']}）\n"
                     f"預計出貨時間：{order['estimated_delivery']}\n"
                     f"備註：{order['note']}"
                 )
@@ -108,7 +131,10 @@ def search_repairs(keyword: str) -> str:
     """搜尋維修單"""
     results = []
     for repair_id, repair in MOCK_REPAIRS.items():
-        if keyword in repair_id or keyword in repair["customer"] or keyword in repair["product"] or keyword in repair["issue"]:
+        if (keyword in repair_id or repair_id in keyword
+                or keyword in repair["customer"] or repair["customer"] in keyword
+                or keyword in repair["product"] or repair["product"] in keyword
+                or keyword in repair["issue"] or repair["issue"] in keyword):
             results.append(
                 f"維修單號：{repair['repair_id']}\n"
                 f"商品：{repair['product']}\n"
@@ -145,11 +171,11 @@ async def get_status(
     if parts:
         fake_result = "\n\n".join(parts)
     elif "訂單" in keyword:
-        fake_result = "在訂單系統中查無相關資訊。請提供您的訂單編號（格式如 SN-XXXXXXXX）以便查詢。"
+        fake_result = "在訂單系統中查無相關資訊。請提供您的訂單編號（格式如 ORD-XXXXXXXX 或 SN-XXXXXXXX）以便查詢。"
     elif "維修" in keyword:
         fake_result = "在維修系統中查無相關資訊。請提供您的維修單號（格式如 R-XXXX）以便查詢。"
     else:
-        fake_result = "查無相關資訊。請提供訂單編號（SN-XXXXXXXX）或維修單號（R-XXXX）以便查詢。"
+        fake_result = "查無相關資訊。請提供訂單編號（ORD-XXXXXXXX 或 SN-XXXXXXXX）或維修單號（R-XXXX）以便查詢。"
 
     return {
         "status": "success",

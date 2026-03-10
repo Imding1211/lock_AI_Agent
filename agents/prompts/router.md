@@ -10,4 +10,3 @@ Analyze the user's question and classify it into exactly ONE of the following in
 3. If the user explicitly asks for human support, classify as "transfer_human".
 4. If the question is clearly unrelated to "{domain}", classify as "out_of_domain".
 5. When in doubt between domain intents, prefer "general_knowledge".
-{tried_agents_section}

@@ -10,4 +10,3 @@ class GraphState(TypedDict):
     history: Annotated[list, operator.add]      # 路徑追蹤（除錯用）
     chat_history: Annotated[list, operator.add] # 對話紀錄
     next_agent: str                             # router 的決定
-    tried_agents: Annotated[list, operator.add] # 已嘗試的 agent（防重試）

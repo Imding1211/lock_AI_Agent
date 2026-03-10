@@ -19,13 +19,9 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
-from core.config import LINE_BOT_CONFIG, LLM_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG, INTENTS_CONFIG
-from core.debounce import evaluate_completeness, calculate_debounce_wait, create_debounce_llm, llm_evaluate, generate_clarification_text
+from core.config import LINE_BOT_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG
 
 from graph.builder import app as langgraph_app
-
-# 初始化防抖 LLM（使用 [llm] 的語言模型設定）
-debounce_llm = create_debounce_llm(DEBOUNCE_CONFIG, LLM_CONFIG)
 
 # 載入環境變數 (.env)
 load_dotenv()
@@ -132,42 +128,11 @@ async def langgraph_and_reply(user_id: str, reply_token: str, text: str) -> tupl
 
 
 async def process_and_reply(user_id: str, reply_token: str):
-    """背景執行：等待防抖 -> 執行 LangGraph -> 嘗試 Reply -> 失敗則 Push"""
+    """背景執行：等待緩衝 -> 執行 LangGraph -> 嘗試 Reply -> 失敗則 Push"""
     try:
-        min_wait = DEBOUNCE_CONFIG.get("min_wait", 1.5)
-        max_wait = DEBOUNCE_CONFIG.get("max_wait", 5.0)
-        threshold = DEBOUNCE_CONFIG.get("completeness_threshold", 0.5)
-
-        # Phase 1: 並行執行 min_wait sleep + LLM 評估
+        await asyncio.sleep(DEBOUNCE_CONFIG.get("buffer_wait", 1.5))
         combined_text = "\n".join(user_buffers[user_id]["text"])
-        sleep_task = asyncio.create_task(asyncio.sleep(min_wait))
-
-        if debounce_llm:
-            llm_task = asyncio.create_task(llm_evaluate(combined_text, INTENTS_CONFIG, debounce_llm))
-        else:
-            llm_task = None
-
-        await sleep_task
-
-        if llm_task:
-            result = await llm_task
-        else:
-            result = {"completeness": evaluate_completeness(combined_text), "intent": None}
-
-        score = result["completeness"]
-
-        # Phase 2: 不完整 → 反問使用者意圖，等待補充
-        if score < threshold:
-            print(f"[Debounce] text='{combined_text}' score={score:.2f} → 反問意圖")
-            clarification = generate_clarification_text(INTENTS_CONFIG)
-            await send_line_message(user_id, reply_token, clarification)
-            user_buffers[user_id]["awaiting_clarification"] = True
-            return
-        else:
-            print(f"[Debounce] text='{combined_text}' score={score:.2f} wait={min_wait}s")
-
-        # Phase 3: 送入 LangGraph（Agent 自行決定工具呼叫）
-        needs_followup, topic_resolved = await langgraph_and_reply(user_id, reply_token, combined_text)
+        _, topic_resolved = await langgraph_and_reply(user_id, reply_token, combined_text)
         if topic_resolved:
             user_sessions[user_id] = user_sessions.get(user_id, 0) + 1
             print(f"  [Session] {user_id} 話題已結束，session 遞增為 {user_sessions[user_id]}")
@@ -175,12 +140,10 @@ async def process_and_reply(user_id: str, reply_token: str):
     except asyncio.CancelledError:
         print(f" ⏳ [任務取消] {user_id} 仍在輸入，更新計時器...")
         raise
-        
+
     finally:
-        # 清理緩衝池（等待反問回覆時不清理，保留累積的訊息）
         if user_id in user_buffers and user_buffers[user_id].get("task") == asyncio.current_task():
-            if not user_buffers[user_id].get("awaiting_clarification"):
-                del user_buffers[user_id]
+            del user_buffers[user_id]
 
 
 async def cleanup_stale_buffers():
@@ -224,13 +187,12 @@ async def line_webhook(request: Request):
         user_id = event.source.user_id
         new_text = event.message.text
         new_token = event.reply_token
-        
+
         print(f"[📥 收到訊息] '{new_text}' (Token: {new_token})")
 
         loading_time = LINE_BOT_CONFIG.get("loading_animation_time", 5)
         async with AsyncApiClient(configuration) as api_client:
             line_bot_api = AsyncMessagingApi(api_client)
-            # 使用 try-except 避免萬一動畫 API 呼叫失敗影響主流程
             try:
                 await line_bot_api.show_loading_animation(
                     ShowLoadingAnimationRequest(chatId=user_id, loadingSeconds=loading_time)
@@ -238,36 +200,8 @@ async def line_webhook(request: Request):
             except Exception as e:
                 print(f"⚠️ 顯示 Loading 動畫失敗: {e}")
 
-        # 防抖核心邏輯
+        # 緩衝邏輯：新訊息重設計時器
         if user_id in user_buffers:
-            if user_buffers[user_id].get("awaiting_clarification"):
-                # 使用者回覆了反問 → 合併後直接送 LangGraph（跳過防抖）
-                print(f"[Debounce] 收到反問回覆，合併後直送 LangGraph")
-                user_buffers[user_id]["text"].append(new_text)
-                user_buffers[user_id]["reply_token"] = new_token
-                user_buffers[user_id]["awaiting_clarification"] = False
-                user_buffers[user_id]["created_at"] = time.monotonic()
-                combined = "\n".join(user_buffers[user_id]["text"])
-
-                async def clarification_followup(uid, token, text):
-                    try:
-                        needs_followup, topic_resolved = await langgraph_and_reply(uid, token, text)
-                        if needs_followup and uid in user_buffers:
-                            user_buffers[uid]["awaiting_clarification"] = True
-                        if topic_resolved:
-                            user_sessions[uid] = user_sessions.get(uid, 0) + 1
-                            print(f"  [Session] {uid} 話題已結束，session 遞增為 {user_sessions[uid]}")
-                    finally:
-                        if uid in user_buffers and user_buffers[uid].get("task") == asyncio.current_task():
-                            if not user_buffers[uid].get("awaiting_clarification"):
-                                del user_buffers[uid]
-
-                new_task = asyncio.create_task(
-                    clarification_followup(user_id, new_token, combined)
-                )
-                user_buffers[user_id]["task"] = new_task
-                continue
-
             user_buffers[user_id]["task"].cancel()
             user_buffers[user_id]["text"].append(new_text)
             user_buffers[user_id]["reply_token"] = new_token
