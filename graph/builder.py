@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, START, END
+from langgraph.types import Send
 from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from graph.state import GraphState
 from graph.nodes import (
@@ -16,17 +17,23 @@ def build_graph():
     tools_dict = build_tools()
     agent_subgraphs = build_all_agents(AGENTS_CONFIG, tools_dict, base_llm)
 
-    # 路由函數：根據 next_agent 決定下一個節點
+    # 路由函數：根據 next_agents 用 Send() 實現 fan-out
     def route_by_intent(state: GraphState):
-        next_agent = state.get("next_agent", "")
-        if next_agent == "out_of_domain":
-            return "out_of_domain"
-        if next_agent == "human":
-            return "human"
-        if next_agent in agent_subgraphs:
-            return next_agent
-        # fallback 到第一個 agent
-        return list(agent_subgraphs.keys())[0] if agent_subgraphs else "out_of_domain"
+        agents = state.get("next_agents", [])
+
+        if not agents:
+            return [Send("out_of_domain", state)]
+        if agents == ["out_of_domain"]:
+            return [Send("out_of_domain", state)]
+        if agents == ["human"]:
+            return [Send("human", state)]
+
+        # 過濾出有效的 agent，無效的跳過
+        valid = [a for a in agents if a in agent_subgraphs]
+        if not valid:
+            return [Send("out_of_domain", state)]
+
+        return [Send(a, state) for a in valid]
 
     # 組裝 StateGraph
     workflow = StateGraph(GraphState)
@@ -45,13 +52,10 @@ def build_graph():
     workflow.add_edge(START, "pre_process")
     workflow.add_edge("pre_process", "router")
 
-    # router → 各 agent / out_of_domain / human
-    route_map = {name: name for name in agent_subgraphs}
-    route_map["out_of_domain"] = "out_of_domain"
-    route_map["human"] = "human"
-    workflow.add_conditional_edges("router", route_by_intent, route_map)
+    # router → 各 agent / out_of_domain / human（透過 Send() fan-out）
+    workflow.add_conditional_edges("router", route_by_intent)
 
-    # 各 agent → post_process（直接連接，不經 check_result）
+    # 各 agent → post_process
     for name in agent_subgraphs:
         workflow.add_edge(name, "post_process")
 

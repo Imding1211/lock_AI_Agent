@@ -50,7 +50,7 @@ async def pre_process(state: GraphState, config: RunnableConfig):
 
 
 async def router(state: GraphState, config: RunnableConfig):
-    """用 LLM 做意圖分類，回傳 next_agent"""
+    """用 LLM 做意圖分類，回傳 next_agents（支援多意圖）"""
     print("  [router] 正在分類意圖...")
 
     domain = SYSTEM_CONFIG.get("domain", "電子鎖")
@@ -79,29 +79,46 @@ async def router(state: GraphState, config: RunnableConfig):
         HumanMessage(content=question),
     ])
 
-    # 解析 LLM 回覆的意圖名稱
-    intent_name = response.content.strip().strip('"').strip("'").lower()
-    print(f"  [router] 意圖分類結果: {intent_name}")
+    # 解析 LLM 回覆（可能含多行意圖名稱）
+    raw = response.content.strip()
+    intent_names = [line.strip().strip('"').strip("'").lower() for line in raw.splitlines() if line.strip()]
+    print(f"  [router] 意圖分類結果: {intent_names}")
 
-    # 從 intents 找到對應的 target (agent name)
-    target = None
+    # 建構意圖名稱 → target 對應表
+    intent_to_target = {}
     for intent in INTENTS_CONFIG:
-        if intent["name"] == intent_name:
-            target = intent.get("target", intent_name)
-            break
+        intent_to_target[intent["name"]] = intent.get("target", intent["name"])
+    valid_agents = {a["name"] for a in AGENTS_CONFIG}
 
-    if not target:
-        # fallback: 如果 LLM 輸出不在預設意圖中，嘗試直接作為 agent name
-        valid_agents = {a["name"] for a in AGENTS_CONFIG}
-        if intent_name in valid_agents:
-            target = intent_name
+    # 逐一解析，去重
+    targets = []
+    seen = set()
+    for intent_name in intent_names:
+        if intent_name in intent_to_target:
+            t = intent_to_target[intent_name]
+        elif intent_name in valid_agents:
+            t = intent_name
         else:
-            target = "product_expert"  # 預設 fallback
-            print(f"  [router] 未知意圖 '{intent_name}'，fallback 到 product_expert")
+            print(f"  [router] 未知意圖 '{intent_name}'，跳過")
+            continue
+        if t not in seen:
+            targets.append(t)
+            seen.add(t)
+
+    if not targets:
+        targets = ["product_expert"]
+        print("  [router] 無有效意圖，fallback 到 product_expert")
+
+    # out_of_domain / human 不與其他意圖混合
+    if "out_of_domain" in targets or "human" in targets:
+        targets = [targets[0]]
+
+    print(f"  [router] 派發目標: {targets}")
 
     return {
-        "next_agent": target,
-        "history": [f"router:{target}"]
+        "next_agent": targets[0],
+        "next_agents": targets,
+        "history": [f"router:{'+'.join(targets)}"]
     }
 
 
@@ -171,17 +188,48 @@ async def post_process(state: GraphState, config: RunnableConfig):
     if existing_answer:
         answer = existing_answer
     else:
-        # 從 messages 中取得最後一個 AI message 作為 answer
-        answer = ""
-        for msg in reversed(state.get("messages", [])):
-            if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
-                content = msg.content
-                if isinstance(content, list):
-                    text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
-                    answer = "\n".join(text_parts).strip()
-                else:
-                    answer = str(content).strip()
-                break
+        # 根據 next_agents 數量決定提取邏輯
+        agents_dispatched = state.get("next_agents", [])
+        num_agents = len(agents_dispatched)
+
+        if num_agents <= 1:
+            # 單一 agent：取最後一個 AI message
+            answer = ""
+            for msg in reversed(state.get("messages", [])):
+                if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
+                    content = msg.content
+                    if isinstance(content, list):
+                        text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+                        answer = "\n".join(text_parts).strip()
+                    else:
+                        answer = str(content).strip()
+                    break
+        else:
+            # 多 agent：收集所有 final AI messages（非 tool_call），用 LLM 合併
+            ai_answers = []
+            for msg in state.get("messages", []):
+                if hasattr(msg, "type") and msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
+                    content = msg.content
+                    if isinstance(content, list):
+                        text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+                        text = "\n".join(text_parts).strip()
+                    else:
+                        text = str(content).strip()
+                    if text:
+                        ai_answers.append(text)
+
+            if len(ai_answers) <= 1:
+                answer = ai_answers[0] if ai_answers else ""
+            else:
+                # 用 LLM 合併多段回覆
+                print(f"  [post_process] 合併 {len(ai_answers)} 段 agent 回覆...")
+                parts = "\n\n---\n\n".join([f"【回覆 {i+1}】\n{a}" for i, a in enumerate(ai_answers)])
+                merge_prompt = (
+                    f"你是電子鎖客服系統。以下是不同專員分別回覆使用者的內容，請合併成一段連貫、語氣一致的繁體中文客服回覆。\n"
+                    f"不要提及「不同專員」或「合併」，直接以統一口吻回覆。\n\n{parts}"
+                )
+                merge_response = await llm.ainvoke([HumanMessage(content=merge_prompt)])
+                answer = merge_response.content.strip()
 
     if not answer:
         answer = "抱歉，系統沒有產生回覆。"

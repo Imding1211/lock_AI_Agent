@@ -180,6 +180,13 @@ target = "product_expert"
 require_slots = false
 
 [[intents]]
+name = "web_search"
+label = "網路搜尋"
+description = "使用者詢問市場趨勢、產品比較、推薦等需要即時網路資訊的問題"
+target = "web_researcher"
+require_slots = false
+
+[[intents]]
 name = "out_of_domain"
 description = "使用者的問題明顯與電子鎖、智慧門鎖完全無關，例如天氣、股票、美食推薦等"
 target = "out_of_domain"
