@@ -1,88 +1,109 @@
 # 系統設定檔 (`config.toml`) 說明文件
 
-本文件詳細說明 RAG 客服系統的核心設定檔 `config.toml` 中各項區塊與參數的意義。
+本文件詳細說明多 Agent RAG 客服系統的核心設定檔 `config.toml` 中各項區塊與參數的意義。
+
+---
 
 ## 1. 系統全局設定 `[system]`
 
-定義系統的業務守備範圍（Domain Guardrail）。這會作為「評分員（Grader）」的嚴格護欄，防止模型回答與業務無關的問題（例如被誘導去回答天氣、新聞或無關的閒聊）。
+定義系統的業務守備範圍（Domain Guardrail）。Router 與各 Agent 會依此判斷問題是否屬於服務範圍，超出範圍的問題會被導向 `out_of_domain` 節點禮貌拒絕。
 
 ```toml
 [system]
 domain = "電子鎖、智慧門鎖相關的產品、安裝、故障排除與售後服務"
-
 ```
 
-* **domain**: 一段清晰描述業務範圍的字串。系統在檢索與生成回覆時，會嚴格把關問題與參考資料是否符合此領域。
+| 參數 | 說明 |
+|------|------|
+| `domain` | 業務範圍描述字串，寫得越清晰，Router 意圖分類的準確率越高 |
 
-## 2. 核心語言模型設定 `[llm]`
+---
 
-設定系統大腦（主要負責意圖判斷、資訊盤點、改寫問題與最終生成）。透過 LLM Factory 動態載入。
+## 2. 訊息緩衝設定 `[debounce]`
+
+LINE 使用者常連續發送多則短訊息。防抖層會緩衝這些訊息，等待一段靜默時間後合併送出，避免重複觸發 LangGraph。
+
+```toml
+[debounce]
+buffer_wait = 1.5  # 最後一則訊息後等待秒數，新訊息會重設計時器
+```
+
+| 參數 | 說明 |
+|------|------|
+| `buffer_wait` | 靜默等待秒數（float），建議 1.0 ~ 3.0 |
+
+---
+
+## 3. LINE Bot 設定 `[line_bot]`
+
+控制 LINE Bot 的行為參數。
+
+```toml
+[line_bot]
+loading_animation_time = 5  # Loading 動畫顯示時間 (秒，必須是 5 的倍數，範圍 5~60)
+```
+
+| 參數 | 說明 |
+|------|------|
+| `loading_animation_time` | 使用者送出訊息後顯示「輸入中」動畫的秒數，必須為 5 的倍數 |
+
+---
+
+## 4. 系統回覆範本 `[templates]`
+
+定義系統層級的罐頭訊息文字。
+
+```toml
+[templates]
+push_fallback_prefix = "【系統通知】讓您久等了，以下是您的回覆：\n"
+```
+
+| 參數 | 說明 |
+|------|------|
+| `push_fallback_prefix` | 當 Reply Token 過期改用 Push API 時，前綴提示文字 |
+
+---
+
+## 5. 核心語言模型設定 `[llm]`
+
+設定系統大腦，驅動 Router 意圖分類、Agent 推理、記憶摘要壓縮、輪廓萃取等所有 LLM 呼叫。透過 LLM Factory（`llms/__init__.py`）動態載入。
 
 ```toml
 [llm]
-provider = "ollama"           # 可選: "ollama", "gemini" 等 (需在 llms/ 註冊)
-model_name = "gemma3:4b"      # 模型名稱
-temperature = 0.7             # 創造力指數 (0.0 ~ 1.0，建議客服情境設低一點)
-base_url = "http://localhost:11434" # Ollama 專用連線網址
-# api_key_env = "GEMINI_API_KEY"    # 若使用 Gemini 等雲端服務，指定環境變數名稱
+provider = "vertexai"               # 支援: "ollama", "gemini", "vertexai"
+model_name = "gemini-2.5-flash"     # 模型名稱
+temperature = 0.3                   # 創造力指數 (0.0 ~ 1.0，客服情境建議低值)
 
+# [Gemini 專用]
+api_key_env = "GEMINI_API_KEY"      # 從 .env 讀取 API Key
+
+# [Ollama 專用]
+base_url = "http://localhost:11434"
+base_url_env = "OLLAMA_BASE_URL"    # 優先讀取環境變數，為空則使用 base_url
+
+# [Vertex AI 專用] (需先執行 gcloud auth application-default login)
+project_id_env = "VERTEX_PROJECT_ID"  # GCP 專案 ID
+location_env = "VERTEX_LOCATION"      # GCP 區域 (例: us-central1)
 ```
 
-## 3. 對話記憶儲存機制 `[memory]`
+| 參數 | 說明 |
+|------|------|
+| `provider` | LLM 供應商，需對應 `llms/` 目錄下已註冊的 provider |
+| `model_name` | 模型名稱，依 provider 不同填入對應值 |
+| `temperature` | 生成溫度，0.0 最保守、1.0 最有創意 |
+| `api_key_env` | Gemini 專用，指向 `.env` 中的 API Key 變數名 |
+| `base_url` | Ollama 專用，本地服務連線網址 |
+| `base_url_env` | Ollama 專用，優先從環境變數讀取 |
+| `project_id_env` | Vertex AI 專用，GCP 專案 ID 環境變數名 |
+| `location_env` | Vertex AI 專用，GCP 區域環境變數名 |
 
-管理系統如何記住跨回合的歷史對話（Checkpointer）。透過 Memory Factory 動態載入。
+> **`_env` 命名慣例**：帶有 `_env` 後綴的參數代表「環境變數名稱」，實際值由 `.env` 檔案提供，避免機密資訊外洩。
 
-```toml
-[memory]
-type = "memory"  # 可選: "memory" (暫存), "sqlite" (本地持久化), "postgres" (資料庫持久化)
-# path = "./chat_history.db"  # 當 type 為 sqlite 時，指定資料庫檔案路徑
-
-```
-
-## 4. 必填資訊收集 (槽位填充) `[required_slots]`
-
-定義系統在進行資料庫檢索前，必須向使用者釐清的關鍵資訊。若使用者未提供，系統會自動中斷檢索並生成「親切的反問句」。若使用者明確表示「不知道」，系統會記錄為 `UNKNOWN` 並繼續流程，並在最終回覆時主動詢問是否轉接真人。
-
-```toml
-[required_slots]
-device_brand = "使用者的電子鎖品牌（例如：Philips 等等）。"
-device_model = "使用者的電子鎖型號（例如：X1 Pro, A3 等等）。"
-
-```
-
-* **參數名稱 (Key)**: 程式內部使用的變數名稱（如 `device_model`）。
-* **參數值 (Value)**: 給 LLM 看的欄位定義與提示，寫得越清楚，LLM 抽取的準確率越高。
-
-## 5. 意圖偵測與分流路由 `[[intents]]`
-
-定義系統的「語意路由（Semantic Routing）」。系統總機會根據使用者的問題，將流程直接「空降」到對應的目標節點，大幅節省不必要的檢索時間。
-
-```toml
-[[intents]]
-name = "order_status"
-description = "使用者想查詢訂單進度、出貨狀況、物流狀態或維修進度"
-target = "db_order_api"  # 必須對應到 [[databases]] 裡面的 name，或是 "human"
-
-[[intents]]
-name = "troubleshooting"
-description = "使用者遇到設備故障、沒有反應、錯誤代碼或需要排除問題"
-target = "db_troubleshooting"
-
-[[intents]]
-name = "transfer_human"
-description = "使用者明確要求轉接真人客服，或是對『是否轉接真人』的問題回答『好』、『需要』。"
-target = "human" # 直接觸發轉接真人節點
-
-[[intents]]
-name = "general_knowledge"
-description = "關於產品規格、如何設定、一般操作問題，或是其他無法分類的問題"
-target = "db_smartlock_manual" # 通常作為預設入口 (Fallback)
-
-```
+---
 
 ## 6. 知識庫與檢索器設定 `[[databases]]`
 
-系統的資料來源。採用陣列設計，系統會依據此處定義的順序形成「階梯式降級（Fallback Chain）」。當上一個資料庫查無資料時，會自動往下一個資料庫查詢。支援透過工廠模式掛載不同類型的檢索器。
+定義系統可用的資料來源。每個 `[[databases]]` 區塊代表一個檢索器（Retriever），透過 Retriever Factory（`retrievers/__init__.py`）動態載入。Agent 透過 `tools` 欄位綁定所需的檢索器。
 
 ### A. 向量資料庫 (ChromaDB)
 
@@ -90,42 +111,220 @@ target = "db_smartlock_manual" # 通常作為預設入口 (Fallback)
 
 ```toml
 [[databases]]
-name = "db_smartlock_manual"      # 節點名稱 (需唯一，供 intents 的 target 綁定)
-type = "chroma"                   # 檢索器類型
-path = "./chroma_db_manual"       # 資料庫本機路徑
-top_k = 2                         # 每次檢索取回最相關的幾筆資料
-embedding_provider = "ollama"     # Embedding 模型供應商
-embedding_model = "nomic-embed-text" # Embedding 模型名稱
-embedding_base_url = "http://localhost:11434"
+name = "db_smartlock_manual"             # 唯一名稱，供 Agent tools 綁定
+type = "chroma"                          # 檢索器類型
+description = "智能門鎖規格、設定與保固手冊"  # Agent 看到的工具描述
+path = "./chroma_db_default"             # 資料庫本機路徑
+top_k = 3                               # 每次檢索取回最相關的幾筆資料
 
+# 向量模型設定
+embedding_provider = "ollama"
+embedding_model = "nomic-embed-text"
+embedding_base_url = "http://localhost:11434"
+embedding_base_url_env = "OLLAMA_BASE_URL"
 ```
+
+| 參數 | 說明 |
+|------|------|
+| `name` | 唯一識別名，Agent 的 `tools` 陣列會引用此名稱 |
+| `type` | 檢索器類型，對應 `retrievers/REGISTRY` 中的 key |
+| `description` | 工具描述，LLM 據此判斷何時呼叫該工具 |
+| `path` | ChromaDB 本機資料夾路徑 |
+| `top_k` | 語意搜尋回傳的最相關文件數量 |
+| `embedding_*` | Embedding 模型設定，透過 Embeddings Factory 載入 |
 
 ### B. 內部 API 串接 (API Store)
 
-適合用來查詢即時的動態資料（如訂單狀態、庫存）。
+適合查詢即時動態資料（如訂單狀態、維修進度）。
 
 ```toml
 [[databases]]
 name = "db_order_api"
 type = "api"
-endpoint = "https://api.example.com/orders" # API 端點
-method = "GET"                    # HTTP 方法 (GET/POST)
-query_param = "order_id"          # 傳遞查詢字串的參數名稱
-response_key = "data"             # JSON 回傳格式中，欲萃取的資料欄位
-timeout = 5                       # 連線超時設定 (秒)
+description = "查詢即時訂單狀態與報修進度"
 
+endpoint = "https://api.sunnie-lock.com/v1/status"  # API 端點
+endpoint_env = "ORDER_API_URL"     # (優先) 從 .env 讀取真實機密網址
+token_env = "ORDER_API_TOKEN"      # (選用) 從 .env 讀取 Bearer Token
+method = "GET"                     # HTTP 方法 (GET/POST)
+timeout = 5                        # 連線超時 (秒)
+
+query_param = "keyword"            # 查詢參數名 (例: ?keyword=問題)
+response_key = "message"           # JSON 回傳中要萃取的欄位
 ```
+
+| 參數 | 說明 |
+|------|------|
+| `endpoint` | API 端點 URL |
+| `endpoint_env` | 從 `.env` 讀取真實 URL（優先於 `endpoint`） |
+| `token_env` | Bearer Token 環境變數名（選用） |
+| `method` | HTTP 方法 |
+| `timeout` | 連線超時秒數 |
+| `query_param` | 使用者問題放入的查詢參數名 |
+| `response_key` | 從 JSON 回傳中萃取的資料欄位 |
 
 ### C. 外部網頁搜尋 (Web Search)
 
-作為最後的知識防線，遇到內部資料庫與 API 都查不到的問題時，啟動外部搜尋引擎。
+當內部資料庫與 API 都查不到時，透過搜尋引擎取得網路資料。
 
 ```toml
 [[databases]]
 name = "db_web_search"
 type = "web_search"
-search_engine = "duckduckgo"      # 搜尋引擎供應商
-max_results = 3                   # 最多參考幾篇網頁結果
+description = "網際網路搜尋引擎"
 
+search_engine = "duckduckgo"       # 免費、免金鑰的搜尋引擎
+max_results = 3                    # 最多參考幾篇網頁結果
 ```
 
+| 參數 | 說明 |
+|------|------|
+| `search_engine` | 搜尋引擎供應商 |
+| `max_results` | 每次搜尋回傳的最大結果數 |
+
+---
+
+## 7. Agent 定義 `[[agents]]`
+
+定義多 Agent 架構中的每個 Agent。Router 根據意圖分類結果，透過 `Send()` fan-out 將請求派發給對應的 Agent 子圖。每個 Agent 是獨立的 LLM + Tools 迴圈。
+
+```toml
+[[agents]]
+name = "product_expert"                          # Agent 唯一名稱
+label = "產品規格專家"                             # 顯示用中文標籤
+description = "負責回答產品規格、設定操作、保固相關問題"  # Agent 職責描述
+tools = ["db_smartlock_manual", "transfer_to_human"]  # 可用工具列表
+prompt_file = "agents/prompts/product_expert.md"      # System Prompt 檔案路徑
+```
+
+| 參數 | 說明 |
+|------|------|
+| `name` | Agent 唯一識別名，`[[intents]]` 的 `target` 會引用此名稱 |
+| `label` | 中文顯示名稱，用於日誌與路徑追蹤 |
+| `description` | Agent 職責描述 |
+| `tools` | 工具清單，元素需對應 `[[databases]]` 的 `name` 或內建工具（如 `transfer_to_human`） |
+| `prompt_file` | System Prompt 的 Markdown 檔案路徑（相對於專案根目錄） |
+
+### 目前系統內建的 Agent
+
+| Agent | 工具 | 用途 |
+|-------|------|------|
+| `product_expert` | `db_smartlock_manual` + `transfer_to_human` | 產品規格、設定操作、保固 |
+| `troubleshooter` | `db_troubleshooting` + `transfer_to_human` | 故障排除、維修指引 |
+| `order_clerk` | `db_order_api` + `transfer_to_human` | 訂單查詢、物流追蹤 |
+| `web_researcher` | `db_web_search` + `transfer_to_human` | 網路搜尋補充資訊 |
+
+> **擴充方式**：新增一個 `[[agents]]` 區塊 + 對應的 prompt 檔案 + `[[intents]]` 路由即可，無需修改程式碼。
+
+---
+
+## 8. 意圖偵測路由設定 `[[intents]]`
+
+定義 Router 的「語意路由（Semantic Routing）」規則。Router 節點使用 LLM 根據這些定義進行意圖分類，支援**多意圖平行派發**（一個問題可同時命中多個意圖）。
+
+```toml
+[[intents]]
+name = "order_status"                # 意圖唯一名稱
+label = "查詢訂單或維修進度"            # 顯示用中文標籤
+description = "使用者想查詢訂單進度、出貨狀況、物流狀態或維修進度"  # 給 LLM 的意圖描述
+target = "order_clerk"               # 路由目標，對應 [[agents]] 的 name
+require_slots = false                # 是否需要先完成槽位填充
+```
+
+| 參數 | 說明 |
+|------|------|
+| `name` | 意圖唯一識別名 |
+| `label` | 中文顯示名稱 |
+| `description` | 意圖描述，LLM 據此判斷使用者問題屬於哪個意圖。寫得越精確，分類越準確 |
+| `target` | 路由目標，可填 `[[agents]]` 的 `name`、`"out_of_domain"` 或 `"human"` |
+| `require_slots` | 是否要求先完成 `[required_slots]` 的槽位填充才進入 Agent |
+
+### 目前系統內建的意圖
+
+| 意圖 | 目標 Agent | 需要槽位 | 說明 |
+|------|-----------|---------|------|
+| `order_status` | `order_clerk` | 否 | 訂單/物流/維修進度查詢 |
+| `troubleshooting` | `troubleshooter` | 是 | 設備故障排除 |
+| `general_knowledge` | `product_expert` | 否 | 產品規格與操作問題（預設 Fallback） |
+| `web_search` | `web_researcher` | 否 | 需要即時網路資訊的問題 |
+| `out_of_domain` | `out_of_domain` | 否 | 非業務範圍，禮貌拒絕 |
+| `transfer_human` | `human` | 否 | 使用者明確堅持轉接真人 |
+
+---
+
+## 9. 對話記憶儲存設定 `[memory]`
+
+管理系統如何記住跨回合的歷史對話（LangGraph Checkpointer）以及語意摘要壓縮策略。透過 Memory Factory（`memory/__init__.py`）動態載入。
+
+```toml
+[memory]
+type = "sqlite"                    # 可選: "memory" (暫存), "sqlite" (本地持久化), "postgres" (資料庫持久化)
+path = "./chat_history.db"         # sqlite 專用，資料庫檔案路徑
+topic_shift_detection = true       # 啟用話題轉換偵測（merge_answers 節點使用）
+max_messages_threshold = 6         # messages 超過此數量時觸發語意摘要壓縮
+context_retention_pair = 2         # 壓縮後保留最近幾對 (human+ai) 訊息
+```
+
+| 參數 | 說明 |
+|------|------|
+| `type` | Checkpointer 類型。`"memory"` 僅存於記憶體（重啟即失）；`"sqlite"` 持久化至本地檔案；`"postgres"` 持久化至 PostgreSQL |
+| `path` | `sqlite` 類型專用，指定 `.db` 檔案路徑 |
+| `topic_shift_detection` | 啟用後，`merge_answers` 會偵測話題是否已解決，並在 `post_process` 記錄 |
+| `max_messages_threshold` | `manage_memory` 節點的觸發門檻。當 `messages` 數量超過此值，LLM 會將舊訊息壓縮為結構化摘要 |
+| `context_retention_pair` | 壓縮後保留的最近對話對數（1 對 = 1 human + 1 ai = 2 條 message） |
+
+> **摘要壓縮流程**：`manage_memory` 節點呼叫 LLM（使用 `summarize_messages.md` 模板）將舊訊息壓縮為結構化摘要，透過 `RemoveMessage` API 刪除已壓縮的訊息，摘要存入 `state.summary`，由 `pre_process` 以 `[前情提要]` SystemMessage 注入後續流程。
+
+---
+
+## 10. 必填資訊收集 `[required_slots]`
+
+定義特定意圖（`require_slots = true`）在進入 Agent 前，必須向使用者釐清的關鍵資訊（Slot Filling）。
+
+```toml
+[required_slots]
+device_model = "使用者的電子鎖型號。"
+device_brand = "使用者的電子鎖品牌。"
+```
+
+| 參數 | 說明 |
+|------|------|
+| Key（如 `device_model`） | 程式內部使用的槽位變數名 |
+| Value（如 `"使用者的電子鎖型號。"`） | 給 LLM 看的欄位定義與提示，寫得越清楚，LLM 抽取的準確率越高 |
+
+---
+
+## 11. 使用者輪廓記憶設定 `[user_profile]`
+
+管理動態使用者輪廓（User Profile），系統會在 `update_profile` 節點透過 LLM 從對話中萃取個人資訊（設備型號、地址、電話等），持久化至檔案系統。
+
+```toml
+[user_profile]
+enabled = true                     # 是否啟用輪廓功能
+profile_dir = "./user_profiles"    # 輪廓檔案儲存目錄
+```
+
+| 參數 | 說明 |
+|------|------|
+| `enabled` | 是否啟用使用者輪廓功能 |
+| `profile_dir` | 輪廓 Markdown 檔案的儲存目錄，每位使用者一個 `{user_id}.md` 檔 |
+
+> **輪廓用途**：`pre_process` 載入輪廓注入對話；`update_profile` 在每輪結束後更新；`transfer_human` 從輪廓提取個資帶入轉接表單。
+
+---
+
+## 附錄：設定區塊與流程節點對應關係
+
+| 設定區塊 | 對應流程節點 / 模組 |
+|---------|-------------------|
+| `[system]` | Router prompt、out_of_domain 判斷 |
+| `[debounce]` | `app.py` 防抖層 |
+| `[line_bot]` | `app.py` Loading 動畫 |
+| `[templates]` | `app.py` Push API fallback |
+| `[llm]` | 所有 LLM 呼叫（Router、Agent、manage_memory、merge_answers、update_profile） |
+| `[[databases]]` | `tools/__init__.py` → Agent 工具 |
+| `[[agents]]` | `graph/builder.py` → Agent 子圖動態建構 |
+| `[[intents]]` | `graph/nodes.py` Router → `Send()` fan-out 派發 |
+| `[memory]` | `memory/__init__.py` → Checkpointer + manage_memory 壓縮策略 |
+| `[required_slots]` | `graph/nodes.py` Router 槽位檢查 |
+| `[user_profile]` | `profiles/manager.py` → pre_process / update_profile |
