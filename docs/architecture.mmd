@@ -1,4 +1,4 @@
-%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4A90D9', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2E6CB5', 'lineColor': '#5C6BC0', 'secondaryColor': '#E8F5E9', 'tertiaryColor': '#FFF3E0'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4A90D9', 'primaryTextColor': '#000', 'primaryBorderColor': '#2E6CB5', 'lineColor': '#333333', 'secondaryColor': '#E8F5E9', 'tertiaryColor': '#FFF3E0'}}}%%
 
 graph TD
     LINE_USER(("LINE 使用者"))
@@ -6,54 +6,72 @@ graph TD
     subgraph debounce_layer ["防抖層（app.py）"]
         direction TB
         webhook["webhook<br/><small>接收 LINE 訊息<br/>顯示 Loading 動畫</small>"]
-        buffer["訊息緩衝池<br/><small>累積多則訊息<br/>取消/重設計時器</small>"]
-        debounce_eval["防抖評估<br/><small>規則式 6 條 + LLM 評分<br/>completeness score</small>"]
-        clarification["反問使用者<br/><small>訊息不完整時<br/>請求補充資訊</small>"]
+        buffer["訊息緩衝池<br/><small>累積多則訊息<br/>新訊息重設計時器<br/>buffer_wait 秒後送出</small>"]
         webhook --> buffer
-        buffer -->|"min_wait 到期"| debounce_eval
-        debounce_eval -->|"score < 門檻"| clarification
-        clarification -.->|"使用者補充"| buffer
     end
 
     subgraph supervisor_graph ["Supervisor Graph（LangGraph + MemorySaver）"]
-        pre_process["pre_process<br/><small>載入 user profile<br/>組裝 messages</small>"]
-        router["router<br/><small>LLM 意圖分類<br/>→ next_agent</small>"]
-        check_result["check_result<br/><small>評估回覆品質<br/>決定 fallback</small>"]
-        post_process["post_process<br/><small>提取 answer<br/>更新 user profile<br/>話題偵測 → session 遞增</small>"]
-        out_of_domain["out_of_domain<br/><small>禮貌拒絕<br/>非業務問題</small>"]
+        pre_process["pre_process<br/><small>載入 user profile<br/>組裝 messages<br/>加入 chat_history</small>"]
+        router["router<br/><small>LLM 意圖分類<br/>支援多意圖<br/>→ next_agents</small>"]
+        merge_answers["merge_answers<br/><small>提取 answer<br/>多 agent 時 LLM 合併<br/>話題偵測</small>"]
+        update_profile["update_profile<br/><small>LLM 萃取個資<br/>更新 user profile</small>"]
+        post_process["post_process<br/><small>記錄 chat_history<br/>回傳最終 answer</small>"]
+        out_of_domain["out_of_domain<br/><small>LLM 禮貌拒絕<br/>非業務問題</small>"]
         human["transfer_human<br/><small>轉接真人客服<br/>帶入已知個資</small>"]
     end
 
-    subgraph product_expert_sub ["product_expert 子圖"]
-        direction LR
-        PE_LLM["agent_llm<br/><small>產品規格專家 prompt</small>"]
-        PE_TOOL["tool_node<br/><small>db_smartlock_manual</small>"]
-        PE_LLM -->|tool_calls| PE_TOOL
-        PE_TOOL -->|tool results| PE_LLM
+    subgraph agents_layer ["Agent 子圖（Send fan-out 平行派發）"]
+        subgraph product_expert_sub ["product_expert"]
+            direction LR
+            PE_LLM["agent_llm"]
+            PE_TOOL["tool_node"]
+            PE_LLM -->|tool_calls| PE_TOOL
+            PE_TOOL -->|tool results| PE_LLM
+        end
+
+        subgraph troubleshooter_sub ["troubleshooter"]
+            direction LR
+            TS_LLM["agent_llm"]
+            TS_TOOL["tool_node"]
+            TS_LLM -->|tool_calls| TS_TOOL
+            TS_TOOL -->|tool results| TS_LLM
+        end
+
+        subgraph order_clerk_sub ["order_clerk"]
+            direction LR
+            OC_LLM["agent_llm"]
+            OC_TOOL["tool_node"]
+            OC_LLM -->|tool_calls| OC_TOOL
+            OC_TOOL -->|tool results| OC_LLM
+        end
+
+        subgraph web_researcher_sub ["web_researcher"]
+            direction LR
+            WR_LLM["agent_llm"]
+            WR_TOOL["tool_node"]
+            WR_LLM -->|tool_calls| WR_TOOL
+            WR_TOOL -->|tool results| WR_LLM
+        end
     end
 
-    subgraph troubleshooter_sub ["troubleshooter 子圖"]
+    subgraph prompts_store ["System Prompts"]
         direction LR
-        TS_LLM["agent_llm<br/><small>故障排除專家 prompt</small>"]
-        TS_TOOL["tool_node<br/><small>db_troubleshooting</small>"]
-        TS_LLM -->|tool_calls| TS_TOOL
-        TS_TOOL -->|tool results| TS_LLM
+        prompt_router[("router.md<br/><small>意圖分類器</small>")]
+        prompt_pe[("product_expert.md<br/><small>產品規格專家</small>")]
+        prompt_ts[("troubleshooter.md<br/><small>故障排除專家</small>")]
+        prompt_oc[("order_clerk.md<br/><small>訂單查詢專員</small>")]
+        prompt_wr[("web_researcher.md<br/><small>網路搜尋助手</small>")]
+        prompt_merge[("merge_answers.md<br/><small>多回覆合併</small>")]
+        prompt_profile[("update_profile.md<br/><small>輪廓更新</small>")]
     end
 
-    subgraph order_clerk_sub ["order_clerk 子圖"]
+    subgraph tools_store ["Tools"]
         direction LR
-        OC_LLM["agent_llm<br/><small>訂單查詢專員 prompt</small>"]
-        OC_TOOL["tool_node<br/><small>db_order_api</small>"]
-        OC_LLM -->|tool_calls| OC_TOOL
-        OC_TOOL -->|tool results| OC_LLM
-    end
-
-    subgraph web_researcher_sub ["web_researcher 子圖"]
-        direction LR
-        WR_LLM["agent_llm<br/><small>網路搜尋助手 prompt</small>"]
-        WR_TOOL["tool_node<br/><small>db_web_search</small>"]
-        WR_LLM -->|tool_calls| WR_TOOL
-        WR_TOOL -->|tool results| WR_LLM
+        tool_manual[("db_smartlock_manual<br/><small>智能門鎖規格、設定與保固手冊</small>")]
+        tool_trouble[("db_troubleshooting<br/><small>常見故障排除與維修指南</small>")]
+        tool_order[("db_order_api<br/><small>查詢即時訂單狀態與報修進度</small>")]
+        tool_web[("db_web_search<br/><small>網際網路搜尋引擎</small>")]
+        tool_transfer[("transfer_to_human<br/><small>轉接真人客服</small>")]
     end
 
     subgraph data_stores ["外部資料源"]
@@ -73,76 +91,93 @@ graph TD
 
     %% LINE → Debounce → LangGraph
     LINE_USER -->|"傳送訊息"| webhook
-    debounce_eval -->|"score >= 門檻"| pre_process
+    buffer -->|"buffer_wait 到期"| pre_process
 
     %% Main flow
     pre_process --> router
 
-    %% Router conditional edges
+    %% Router conditional edges (Send() fan-out，多意圖可平行派發)
     router -->|"general_knowledge"| product_expert_sub
     router -->|"troubleshooting"| troubleshooter_sub
     router -->|"order_status"| order_clerk_sub
-    router -->|"web_search fallback"| web_researcher_sub
+    router -->|"web_search"| web_researcher_sub
     router -->|"out_of_domain"| out_of_domain
-    router -->|"transfer_human"| human
+    router -->|"transfer_human<br/><small>僅使用者明確堅持</small>"| human
 
-    %% Agent → check_result
-    product_expert_sub --> check_result
-    troubleshooter_sub --> check_result
-    order_clerk_sub --> check_result
-    web_researcher_sub --> check_result
-
-    %% check_result conditional edges
-    check_result -->|"充足"| post_process
-    check_result -.->|"不足 fallback"| router
-    check_result -.->|"全部耗盡"| human
+    %% Agent → merge_answers
+    product_expert_sub --> merge_answers
+    troubleshooter_sub --> merge_answers
+    order_clerk_sub --> merge_answers
+    web_researcher_sub --> merge_answers
 
     %% Terminal edges
-    out_of_domain --> post_process
-    human --> post_process
+    out_of_domain --> merge_answers
+    human --> merge_answers
+    merge_answers --> update_profile
+    update_profile --> post_process
     post_process -->|"Reply / Push API"| LINE_USER
 
+    %% Prompt → node connections
+    prompt_router --- router
+    prompt_pe --- PE_LLM
+    prompt_ts --- TS_LLM
+    prompt_oc --- OC_LLM
+    prompt_wr --- WR_LLM
+    prompt_merge --- merge_answers
+    prompt_profile --- update_profile
+
+    %% Tool → tool_node connections
+    tool_manual --- PE_TOOL
+    tool_transfer --- PE_TOOL
+    tool_trouble --- TS_TOOL
+    tool_transfer --- TS_TOOL
+    tool_order --- OC_TOOL
+    tool_transfer --- OC_TOOL
+    tool_web --- WR_TOOL
+    tool_transfer --- WR_TOOL
+
     %% Tool → Data Store connections
-    PE_TOOL --- chroma_manual
-    TS_TOOL --- chroma_trouble
-    OC_TOOL --- order_api
-    WR_TOOL --- duckduckgo
+    tool_manual --- chroma_manual
+    tool_trouble --- chroma_trouble
+    tool_order --- order_api
+    tool_web --- duckduckgo
 
     %% User Profile persistence
     pre_process -.->|"載入"| profile_store
-    post_process -.->|"儲存"| profile_store
+    update_profile -.->|"儲存"| profile_store
 
     %% LLM connections
-    LLM_ENGINE -..- debounce_eval
     LLM_ENGINE -..- router
     LLM_ENGINE -..- PE_LLM
     LLM_ENGINE -..- TS_LLM
     LLM_ENGINE -..- OC_LLM
     LLM_ENGINE -..- WR_LLM
+    LLM_ENGINE -..- merge_answers
+    LLM_ENGINE -..- update_profile
 
     %% Styling
-    classDef userNode fill:#1B5E20,stroke:#0D3B11,color:#fff,stroke-width:2px
-    classDef debounce fill:#FF6F00,stroke:#E65100,color:#fff,stroke-width:1px
-    classDef clarify fill:#F9A825,stroke:#F57F17,color:#333,stroke-width:1px
-    classDef process fill:#4A90D9,stroke:#2E6CB5,color:#fff,stroke-width:1px
-    classDef router_style fill:#FF8F00,stroke:#E65100,color:#fff,stroke-width:2px
-    classDef check_style fill:#7B1FA2,stroke:#4A148C,color:#fff,stroke-width:2px
-    classDef special fill:#E53935,stroke:#B71C1C,color:#fff,stroke-width:1px
-    classDef agent_llm fill:#43A047,stroke:#2E7D32,color:#fff,stroke-width:1px
-    classDef agent_tool fill:#26A69A,stroke:#00897B,color:#fff,stroke-width:1px
-    classDef datastore fill:#5D4037,stroke:#3E2723,color:#fff,stroke-width:1px
-    classDef persist fill:#37474F,stroke:#263238,color:#fff,stroke-width:1px
-    classDef llm_style fill:#1565C0,stroke:#0D47A1,color:#fff,stroke-width:2px
+    classDef userNode fill:#A5D6A7,stroke:#388E3C,color:#000,stroke-width:2px
+    classDef debounce fill:#FFE0B2,stroke:#F57C00,color:#000,stroke-width:1px
+    classDef process fill:#BBDEFB,stroke:#1976D2,color:#000,stroke-width:1px
+    classDef router_style fill:#FFCC80,stroke:#EF6C00,color:#000,stroke-width:2px
+    classDef special fill:#FFCDD2,stroke:#D32F2F,color:#000,stroke-width:1px
+    classDef agent_llm fill:#C8E6C9,stroke:#43A047,color:#000,stroke-width:1px
+    classDef agent_tool fill:#B2DFDB,stroke:#00897B,color:#000,stroke-width:1px
+    classDef datastore fill:#D7CCC8,stroke:#5D4037,color:#000,stroke-width:1px
+    classDef persist fill:#CFD8DC,stroke:#455A64,color:#000,stroke-width:1px
+    classDef llm_style fill:#90CAF9,stroke:#1565C0,color:#000,stroke-width:2px
+    classDef prompt_style fill:#E1BEE7,stroke:#7B1FA2,color:#000,stroke-width:1px
+    classDef tool_style fill:#B2EBF2,stroke:#0097A7,color:#000,stroke-width:1px
 
     class LINE_USER userNode
-    class webhook,buffer,debounce_eval debounce
-    class clarification clarify
-    class pre_process,post_process process
+    class webhook,buffer debounce
+    class pre_process,merge_answers,update_profile,post_process process
     class router router_style
-    class check_result check_style
     class out_of_domain,human special
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
     class profile_store persist
     class LLM_ENGINE llm_style
+    class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile prompt_style
+    class tool_manual,tool_trouble,tool_order,tool_web,tool_transfer tool_style

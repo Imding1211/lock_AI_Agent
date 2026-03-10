@@ -4,7 +4,7 @@ from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from graph.state import GraphState
 from graph.nodes import (
     pre_process, router, handle_out_of_domain,
-    handle_transfer_human, post_process,
+    handle_transfer_human, merge_answers, update_profile, post_process,
     llm as base_llm
 )
 from memory import get_checkpointer
@@ -43,6 +43,8 @@ def build_graph():
     workflow.add_node("router", router)
     workflow.add_node("out_of_domain", handle_out_of_domain)
     workflow.add_node("human", handle_transfer_human)
+    workflow.add_node("merge_answers", merge_answers)
+    workflow.add_node("update_profile", update_profile)
     workflow.add_node("post_process", post_process)
 
     for name, subgraph in agent_subgraphs.items():
@@ -55,15 +57,17 @@ def build_graph():
     # router → 各 agent / out_of_domain / human（透過 Send() fan-out）
     workflow.add_conditional_edges("router", route_by_intent)
 
-    # 各 agent → post_process
+    # 各 agent → merge_answers
     for name in agent_subgraphs:
-        workflow.add_edge(name, "post_process")
+        workflow.add_edge(name, "merge_answers")
 
-    # out_of_domain → post_process
-    workflow.add_edge("out_of_domain", "post_process")
-    # human → post_process
-    workflow.add_edge("human", "post_process")
-    # post_process → END
+    # out_of_domain → merge_answers
+    workflow.add_edge("out_of_domain", "merge_answers")
+    # human → merge_answers
+    workflow.add_edge("human", "merge_answers")
+    # merge_answers → update_profile → post_process → END
+    workflow.add_edge("merge_answers", "update_profile")
+    workflow.add_edge("update_profile", "post_process")
     workflow.add_edge("post_process", END)
 
     # Checkpointer

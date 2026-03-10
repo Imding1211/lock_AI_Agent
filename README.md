@@ -4,19 +4,23 @@
 
 ## 功能特色
 
-- **多源檢索降級鏈**：產品手冊 → 故障排除 → 訂單 API → 網頁搜尋 → 轉接真人
-- **意圖路由**：自動偵測使用者意圖，導向對應的檢索節點
-- **Slot Filling**：缺少必要資訊（品牌、型號）時主動反問
-- **對話記憶**：跨回合記憶與指代還原 (Query Rewrite)
-- **使用者輪廓**：自動記錄並載入使用者偏好與設備資訊
-- **智慧防抖**：LINE 訊息緩衝合併，避免碎片化處理
+- **多 Agent 架構**：Router 意圖分類 → 專職 Agent 子圖（product_expert / troubleshooter / order_clerk / web_researcher）
+- **多意圖平行派發**：Send() fan-out，一則訊息可同時觸發多個 Agent 並行處理
+- **自主解決優先**：Agent 竭盡所能自主解決，僅在使用者明確堅持或涉及安全風險時轉接真人
+- **對話記憶**：跨回合 chat_history + 話題偵測 session 遞增
+- **使用者輪廓**：自動萃取並持久化使用者設備、地址、電話等個資
+- **訊息防抖**：LINE 訊息緩衝合併，計時器重設機制避免碎片化處理
 - **設定驅動**：透過 `config.toml` 管理所有設定，無需改程式碼即可擴充
 
 ## 系統架構
 
 ```
-START → load_user_profile → rewrite_query → detect_intent → extract_slots
-  → ask_missing_slots → [retriever node] → grader → generate → update_user_profile → END
+START → pre_process → router →  product_expert  ─┐
+                            →  troubleshooter   ─┤
+                            →  order_clerk       ─┤→ post_process → END
+                            →  web_researcher   ─┤
+                            →  out_of_domain     ─┤
+                            →  transfer_human    ─┘
 ```
 
 ## 快速開始

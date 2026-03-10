@@ -179,9 +179,9 @@ async def handle_transfer_human(state: GraphState, config: RunnableConfig):
     }
 
 
-async def post_process(state: GraphState, config: RunnableConfig):
-    """從 agent 最終回覆提取 answer、更新 user profile"""
-    print("  [post_process] 正在提取最終回覆並更新輪廓...")
+async def merge_answers(state: GraphState):
+    """從 agent 回覆提取 answer（多 agent 用 LLM 合併）+ 偵測 topic_resolved"""
+    print("  [merge_answers] 正在提取並合併回覆...")
 
     # 如果 answer 已經被設定（例如 out_of_domain 或 transfer_human），直接使用
     existing_answer = state.get("answer", "")
@@ -222,19 +222,22 @@ async def post_process(state: GraphState, config: RunnableConfig):
                 answer = ai_answers[0] if ai_answers else ""
             else:
                 # 用 LLM 合併多段回覆
-                print(f"  [post_process] 合併 {len(ai_answers)} 段 agent 回覆...")
-                parts = "\n\n---\n\n".join([f"【回覆 {i+1}】\n{a}" for i, a in enumerate(ai_answers)])
-                merge_prompt = (
-                    f"你是電子鎖客服系統。以下是不同專員分別回覆使用者的內容，請合併成一段連貫、語氣一致的繁體中文客服回覆。\n"
-                    f"不要提及「不同專員」或「合併」，直接以統一口吻回覆。\n\n{parts}"
+                print(f"  [merge_answers] 合併 {len(ai_answers)} 段 agent 回覆...")
+                domain = SYSTEM_CONFIG.get("domain", "電子鎖")
+                merge_prompt = load_prompt_template(
+                    "agents/prompts/merge_answers.md",
+                    domain=domain,
                 )
-                merge_response = await llm.ainvoke([HumanMessage(content=merge_prompt)])
+                parts = "\n\n---\n\n".join([f"【回覆 {i+1}】\n{a}" for i, a in enumerate(ai_answers)])
+                merge_response = await llm.ainvoke([
+                    HumanMessage(content=f"{merge_prompt}\n\n{parts}")
+                ])
                 answer = merge_response.content.strip()
 
     if not answer:
         answer = "抱歉，系統沒有產生回覆。"
 
-    print(f"  [post_process] 最終回覆: {answer[:10]}...")
+    print(f"  [merge_answers] 最終回覆: {answer[:10]}...")
 
     # 判斷是否為轉接真人（檢查 history 和 tool 呼叫）
     topic_resolved = False
@@ -255,56 +258,56 @@ async def post_process(state: GraphState, config: RunnableConfig):
                                 break
                         break
 
-    history_items = ["post_process"]
+    history_items = ["merge_answers"]
     if topic_resolved:
         history_items.append("topic_resolved")
 
-    # 更新 user profile
+    return {
+        "answer": answer,
+        "history": history_items,
+    }
+
+
+async def update_profile(state: GraphState, config: RunnableConfig):
+    """用 LLM 從對話萃取個資並更新 user profile"""
+    print("  [update_profile] 正在更新使用者輪廓...")
+
+    answer = state.get("answer", "")
+
     if USER_PROFILE_CONFIG.get("enabled", False) and answer:
         cfg = config.get("configurable", {})
         user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
         existing_profile = state.get("user_profile", "")
         question = state.get("question", "")
+        domain = SYSTEM_CONFIG.get("domain", "電子鎖")
 
-        prompt = f"""
-    You are a user profile manager for a smart lock customer service system.
-    Your task is to analyze the conversation and update the user's profile with any new personal information.
-
-    [Existing User Profile]
-    {existing_profile if existing_profile else "(empty - new user)"}
-
-    [Latest Conversation]
-    User: {question}
-    AI: {answer}
-
-    Instructions:
-    1. Identify any NEW or CORRECTED personal information from the conversation, such as:
-       - Device model or brand (設備型號、品牌)
-       - Living environment (居住環境, e.g., apartment, house)
-       - Address (聯絡地址 — full street address, keep the original text exactly)
-       - Phone number (電話號碼 — keep the original format exactly, e.g., 0912-345-678)
-       - Installation date (安裝日期)
-       - Past issues or concerns (過去遇到的問題)
-       - Preferences or special requirements (偏好或特殊需求)
-    2. IMPORTANT: Always preserve address and phone number verbatim from the user's message. Do NOT omit, summarize, or paraphrase them.
-    3. If the user CORRECTS or UPDATES previously recorded information, REPLACE the old value with the new one.
-    4. Merge new information into the existing profile.
-    5. Output the COMPLETE updated profile in Markdown format (Traditional Chinese).
-    6. If there is NO new personal information to record, output the existing profile as-is.
-    7. Do NOT include the conversation content itself, only extracted personal facts.
-    8. Keep it concise and well-organized with headers.
-
-    Output the updated profile in Markdown:
-    """
+        prompt = load_prompt_template(
+            "agents/prompts/update_profile.md",
+            domain=domain,
+            existing_profile=existing_profile if existing_profile else "(empty - new user)",
+            question=question,
+            answer=answer,
+        )
 
         try:
             response = await llm.ainvoke(prompt)
             updated = response.content.strip()
             if updated and len(updated) >= 10:
                 await profile_manager.save_profile(user_id, updated)
-                print(f"  [post_process] 已更新 {user_id} 的輪廓")
+                print(f"  [update_profile] 已更新 {user_id} 的輪廓")
         except Exception as e:
-            print(f"  [post_process] 更新輪廓失敗: {e}")
+            print(f"  [update_profile] 更新輪廓失敗: {e}")
+
+    return {
+        "history": ["update_profile"]
+    }
+
+
+async def post_process(state: GraphState):
+    """記錄 chat_history 並回傳最終 answer"""
+    print("  [post_process] 記錄對話歷史...")
+
+    answer = state.get("answer", "")
 
     # 記錄對話歷史
     new_exchange = [
@@ -314,6 +317,6 @@ async def post_process(state: GraphState, config: RunnableConfig):
 
     return {
         "answer": answer,
-        "history": history_items,
+        "history": ["post_process"],
         "chat_history": new_exchange
     }
