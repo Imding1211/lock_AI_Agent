@@ -71,14 +71,14 @@ async def run_langgraph(user_id: str, user_text: str) -> tuple[str, list]:
         prev_history_len = len(prev_state.values.get("history", [])) if prev_state.values else 0
 
         # 4. 使用非同步呼叫 (ainvoke) 執行圖表，加上 timeout 防止永遠 hang
-        print(f"🧠 [LangGraph] 開始思考 user_id: {user_id} 的問題...")
+        print(f"[LangGraph] 開始思考 user_id: {user_id} 的問題...")
         try:
             result_state = await asyncio.wait_for(
                 langgraph_app.ainvoke(inputs, config=config),
                 timeout=LANGGRAPH_TIMEOUT
             )
         except asyncio.TimeoutError:
-            print(f"⏱️ [LangGraph 超時] {user_id} 的問題處理超過 {LANGGRAPH_TIMEOUT} 秒")
+            print(f"[LangGraph 超時] {user_id} 的問題處理超過 {LANGGRAPH_TIMEOUT} 秒")
             return "不好意思，系統處理時間過長，請稍後再試一次。如果問題持續，建議轉接真人客服。", []
 
         # 5. 取出 answer，並只回傳本次 run 新增的 history items
@@ -88,7 +88,7 @@ async def run_langgraph(user_id: str, user_text: str) -> tuple[str, list]:
         return final_answer, current_history
 
     except Exception as e:
-        print(f"❌ [LangGraph 執行錯誤] {e}")
+        print(f"[LangGraph 執行錯誤] {e}")
         return "不好意思，系統大腦剛剛稍微當機了一下，請稍後再試一次！", []
 
 async def send_line_message(user_id: str, reply_token: str, message_text: str):
@@ -96,32 +96,32 @@ async def send_line_message(user_id: str, reply_token: str, message_text: str):
     async with AsyncApiClient(configuration) as api_client:
         line_bot_api = AsyncMessagingApi(api_client)
         try:
-            print("🟢 嘗試使用 Reply API 回覆...")
+            print("[Reply] 嘗試使用 Reply API 回覆...")
             await line_bot_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=reply_token,
                     messages=[TextMessage(text=message_text)]
                 )
             )
-            print("✅ Reply 成功！(免費)")
+            print("[Reply] 成功！(免費)")
         except ApiException as e:
-            print(f"⚠️ Reply 失敗 (Token可能已失效): {e.status} - 準備降級使用 Push API")
+            print(f"[Reply] 失敗 (Token可能已失效): {e.status} - 準備降級使用 Push API")
             fallback_prefix = TEMPLATES_CONFIG.get("push_fallback_prefix", "【系統通知】讓您久等了，以下是您的回覆：\n")
-            print("🟡 嘗試使用 Push API 推播...")
+            print("[Push] 嘗試使用 Push API 推播...")
             await line_bot_api.push_message(
                 PushMessageRequest(
                     to=user_id,
                     messages=[TextMessage(text=fallback_prefix + message_text)]
                 )
             )
-            print("✅ Push 成功！(花費額度)")
+            print("[Push] 成功！(花費額度)")
 
 
 async def langgraph_and_reply(user_id: str, reply_token: str, text: str) -> tuple[bool, bool]:
     """執行 LangGraph 並回覆使用者，回傳 (是否需要後續 slot 追問, 話題是否已結束)"""
-    print(f"\n🚀 [開始處理] 準備將 '{text}' 送入 LangGraph...")
+    print(f"\n[開始處理] 準備將 '{text}' 送入 LangGraph...")
     ai_response, history = await run_langgraph(user_id, text)
-    print(f"🧠 [LangGraph] 思考完畢！準備回傳...")
+    print(f"[LangGraph] 思考完畢！準備回傳...")
     await send_line_message(user_id, reply_token, ai_response)
     topic_resolved = "topic_resolved" in history
     return False, topic_resolved
@@ -188,7 +188,7 @@ async def line_webhook(request: Request):
         new_text = event.message.text
         new_token = event.reply_token
 
-        print(f"[📥 收到訊息] '{new_text}' (Token: {new_token})")
+        print(f"[收到訊息] '{new_text}' (Token: {new_token})")
 
         loading_time = LINE_BOT_CONFIG.get("loading_animation_time", 5)
         async with AsyncApiClient(configuration) as api_client:
@@ -198,7 +198,7 @@ async def line_webhook(request: Request):
                     ShowLoadingAnimationRequest(chatId=user_id, loadingSeconds=loading_time)
                 )
             except Exception as e:
-                print(f"⚠️ 顯示 Loading 動畫失敗: {e}")
+                print(f"[Warning] 顯示 Loading 動畫失敗: {e}")
 
         # 緩衝邏輯：新訊息重設計時器
         if user_id in user_buffers:

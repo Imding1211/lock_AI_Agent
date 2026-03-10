@@ -36,7 +36,7 @@ def _build_transfer_to_human_tool() -> StructuredTool:
     """建立轉接真人客服的工具"""
 
     async def _transfer(user_id: str = "anonymous") -> str:
-        """當所有工具都無法回答使用者問題，或使用者明確要求轉接真人客服時，呼叫此工具。參數 user_id: 使用者 ID"""
+        """當使用者明確堅持要求轉接真人客服，或涉及安全風險時，呼叫此工具。參數 user_id: 使用者 ID"""
         print(f"  [Tool 呼叫] transfer_to_human: user_id={user_id}")
 
         user_profile = await profile_manager.load_profile(user_id)
@@ -78,7 +78,7 @@ def _build_transfer_to_human_tool() -> StructuredTool:
         func=_transfer_sync,
         coroutine=_transfer,
         name="transfer_to_human",
-        description="轉接真人客服。當所有資料來源都無法回答使用者問題，或使用者明確要求轉接真人客服時使用。",
+        description="轉接真人客服。僅在以下情況使用：(1) 使用者明確堅持要求轉接真人客服 (2) 涉及安全風險（門鎖無法上鎖、疑似被破壞）。不要因為資料不足就轉接，應先嘗試提供通用建議。",
     )
 
 

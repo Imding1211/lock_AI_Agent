@@ -10,3 +10,4 @@ Analyze the user's question and classify it into ONE OR MORE of the following in
 3. "out_of_domain" and "transfer_human" should ALWAYS be the only intent (never combined with other intents).
 4. Consider the conversation history when classifying.
 5. When in doubt between domain intents, prefer "general_knowledge".
+6. "transfer_human" should only be used when the user EXPLICITLY and PERSISTENTLY requests human support (e.g., "轉接真人", "我要找真人客服"). Do not classify as "transfer_human" if the user is simply frustrated or asking difficult questions.

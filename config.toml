@@ -195,7 +195,7 @@ require_slots = false
 [[intents]]
 name = "transfer_human"
 label = "轉接真人客服"
-description = "使用者明確要求轉接真人客服，或是對『是否轉接真人』的問題回答『好』、『需要』、『麻煩你了』。"
+description = "使用者明確且堅持要求轉接真人客服（例如直接說『轉接真人』『我要找真人客服』）。僅在使用者主動要求時觸發，不要因為問題困難或資料不足就分類為此意圖。"
 target = "human"
 require_slots = false
 
