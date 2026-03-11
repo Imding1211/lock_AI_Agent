@@ -115,14 +115,12 @@ async def send_line_message(user_id: str, reply_token: str, message_text: str):
             print("[Push] 成功！(花費額度)")
 
 
-async def langgraph_and_reply(user_id: str, reply_token: str, text: str) -> tuple[bool, bool]:
-    """執行 LangGraph 並回覆使用者，回傳 (是否需要後續 slot 追問, 話題是否已結束)"""
+async def langgraph_and_reply(user_id: str, reply_token: str, text: str):
+    """執行 LangGraph 並回覆使用者"""
     print(f"\n[開始處理] 準備將 '{text}' 送入 LangGraph...")
     ai_response, history = await run_langgraph(user_id, text)
     print(f"[LangGraph] 思考完畢！準備回傳...")
     await send_line_message(user_id, reply_token, ai_response)
-    topic_resolved = "topic_resolved" in history
-    return False, topic_resolved
 
 
 async def process_and_reply(user_id: str, reply_token: str):
@@ -130,9 +128,7 @@ async def process_and_reply(user_id: str, reply_token: str):
     try:
         await asyncio.sleep(DEBOUNCE_CONFIG.get("buffer_wait", 1.5))
         combined_text = "\n".join(user_buffers[user_id]["text"])
-        _, topic_resolved = await langgraph_and_reply(user_id, reply_token, combined_text)
-        if topic_resolved:
-            print(f"  [Session] {user_id} 話題已結束")
+        await langgraph_and_reply(user_id, reply_token, combined_text)
 
     except asyncio.CancelledError:
         print(f" ⏳ [任務取消] {user_id} 仍在輸入，更新計時器...")

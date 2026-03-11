@@ -180,7 +180,6 @@ async def router(state: GraphState, config: RunnableConfig):
     print(f"  [router] 派發目標: {targets}")
 
     return {
-        "next_agent": targets[0],
         "next_agents": targets,
         "history": [f"router:{'+'.join(targets)}"]
     }
@@ -372,19 +371,10 @@ async def update_profile(state: GraphState, config: RunnableConfig):
 
 
 async def post_process(state: GraphState):
-    """記錄 chat_history 並回傳最終 answer"""
-    print("  [post_process] 記錄對話歷史...")
-
+    """回傳最終 answer"""
+    print("  [post_process] 回傳最終回覆...")
     answer = state.get("answer", "")
-
-    # 記錄對話歷史
-    new_exchange = [
-        f"User: {state['question']}",
-        f"AI: {answer}"
-    ]
-
     return {
         "answer": answer,
-        "history": ["post_process"],
-        "chat_history": new_exchange
+        "history": ["post_process"]
     }

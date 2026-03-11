@@ -205,7 +205,6 @@ require_slots = false
 [memory]
 type = "sqlite"
 path = "./chat_history.db"
-topic_shift_detection = true
 max_messages_threshold = 6
 context_retention_pair = 2
 
