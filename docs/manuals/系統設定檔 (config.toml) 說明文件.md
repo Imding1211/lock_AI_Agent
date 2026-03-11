@@ -275,7 +275,7 @@ require_slots = false                # 是否需要先完成槽位填充
 type = "sqlite"                    # 可選: "memory" (暫存), "sqlite" (本地持久化), "postgres" (資料庫持久化)
 sqlite_path = "./data/db/chat_history.db"  # sqlite 專用，資料庫檔案路徑
 # postgres_uri_env = "POSTGRES_URI"        # PostgreSQL 連線字串（未來擴充）
-max_messages_threshold = 6         # messages 超過此數量時觸發語意摘要壓縮
+max_messages_threshold = 10        # messages 超過此數量時觸發語意摘要壓縮
 context_retention_pair = 2         # 壓縮後保留最近幾對 (human+ai) 訊息
 ```
 

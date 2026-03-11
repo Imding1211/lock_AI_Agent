@@ -83,7 +83,6 @@ location_env   = "VERTEX_LOCATION"     # .env 中的 GCP 區域（例: us-centra
 #    陣列順序即為優先級，Agent 透過 tools 欄位引用
 # ==========================================
 
-# --- 優先級 1：產品手冊（Chroma 向量庫）---
 [[databases]]
 name        = "db_smartlock_manual"
 type        = "chroma"
@@ -96,7 +95,6 @@ embedding_model        = "nomic-embed-text"
 embedding_base_url     = "http://localhost:11434"
 embedding_base_url_env = "OLLAMA_BASE_URL"
 
-# --- 優先級 2：故障排除（Chroma 向量庫）---
 [[databases]]
 name        = "db_troubleshooting"
 type        = "chroma"
@@ -109,7 +107,6 @@ embedding_model        = "nomic-embed-text"
 embedding_base_url     = "http://localhost:11434"
 embedding_base_url_env = "OLLAMA_BASE_URL"
 
-# --- 優先級 3：即時訂單查詢（RESTful API）---
 [[databases]]
 name        = "db_order_api"
 type        = "api"
@@ -124,7 +121,6 @@ timeout      = 5
 query_param  = "keyword"    # 使用者問題放入的 query 參數（例: ?keyword=問題）
 response_key = "message"    # 從 JSON 回傳中擷取的欄位名稱
 
-# --- 優先級 4：網頁搜尋（Web Search Fallback）---
 [[databases]]
 name        = "db_web_search"
 type        = "web_search"
