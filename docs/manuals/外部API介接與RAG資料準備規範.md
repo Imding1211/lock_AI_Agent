@@ -6,22 +6,22 @@
 
 ## 1. RAG 知識庫資料準備 (Vector DB)
 
-系統透過 `scripts/seed_db.py` 讀取 `documents/` 目錄下的內容，將其轉化為 ChromaDB 向量庫。
+系統目前的示範資料直接定義於 `scripts/seed_db.py` 腳本中。執行該腳本會將內建的 Document 物件寫入 ChromaDB 向量庫。
 
-### 1.1 資料格式規範
-*   **格式**：建議使用 `.md` 或 `.txt`。
-*   **內容結構**：每份文件應專注於單一主題（例如「SL-3000 型號指紋錄入步驟」）。
-*   **中繼資料 (Metadata)**：雖然目前由程式自動切分，但建議在文件開頭寫明產品型號與產品名稱，這有助於 Embedding 捕捉關聯性。
+### 1.1 資料內容規範
+*   **目前位置**：資料定義在 `scripts/seed_db.py` 的 `manual_docs`（產品手冊）與 `troubleshooting_docs`（故障排除）清單中。
+*   **內容結構**：每份 Document 應專注於單一主題（例如「Philips Alpha 指紋設定步驟」）。
+*   **中繼資料 (Metadata)**：建議包含 brand（品牌）、model（型號）與 source（來源檔案名稱）等欄位，這有助於 Embedding 捕捉關聯性並讓 Agent 進行精準過濾。
 
 ### 1.2 資料分割 (Chunking) 建議
-*   目前使用 `RecursiveCharacterTextSplitter`。
-*   `chunk_size` 設為 500，`chunk_overlap` 設為 50。
-*   若要更改分割策略，請至 `scripts/seed_db.py` 進行調整。
+*   目前示範資料採手動切分好的 Document 物件。
+*   若未來擴充為讀取外部檔案，建議使用 `RecursiveCharacterTextSplitter`。
+*   建議 `chunk_size` 設為 500 字，`chunk_overlap` 設為 50 字。
 
 ### 1.3 更新知識庫流程
-1.  將新文件放入 `documents/` 子目錄下。
-2.  刪除對應的資料庫資料夾（例如 `./data/db/chroma_db_default`）。
-3.  重新執行 `python scripts/seed_db.py`。
+1.  修改 `scripts/seed_db.py` 中的 `manual_docs` 或 `troubleshooting_docs` 列表，加入新的 Document 物件。
+2.  執行腳本：`python scripts/seed_db.py`。
+3.  該腳本會自動根據 `config.toml` 中的 `[[databases]]` 路徑清理舊資料並重建索引。
 
 ---
 
