@@ -96,7 +96,7 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
         summary = vals.get("summary", "")
         print(f"[記憶] messages={len(msgs)}, summary={len(summary)}字")
         if summary:
-            print(f"[摘要] {summary}")
+            print(f"[摘要] {summary[:15]}...")
 
     print()
 
@@ -132,7 +132,7 @@ if __name__ == "__main__":
             "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
             thread_id="demo_human"
         )
-        """
+
 
         # --- SQLite 持久化驗證 ---
         print("=" * 40)
@@ -148,7 +148,7 @@ if __name__ == "__main__":
             print(f"[最終] thread={T}, messages={len(msgs)}, summary={len(summary)}字")
             if summary:
                 print(f"[摘要] {summary}")
-
+        """
         await close_checkpointer()
         
     asyncio.run(main())
