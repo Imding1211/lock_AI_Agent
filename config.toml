@@ -2,215 +2,224 @@
 # 客服系統 - 核心設定檔 (config.toml)
 # ==========================================
 # 說明：
-# 1. 本檔案定義系統的「語言模型」與「檢索流程」。
-# 2. 陣列 [[databases]] 的上下順序，即為 LangGraph 檢索的優先順序。
-# 3. 帶有資安機密性質的資料，請寫在對應的 `_env` 變數中，並由 .env 檔案提供。
-# 4. 若不需要某個功能，將該 [[databases]] 區塊全數加上 # 註解即可。
+# 1. 本檔案定義系統所有可配置的行為，共 10 個區塊。
+# 2. 帶有資安機密性質的資料，請寫在對應的 `_env` 變數中，並由 .env 檔案提供。
+# 3. 若不需要某個功能，將該區塊全數加上 # 註解即可。
+#
+# 區塊索引：
+#   1. [system]          — 系統全局設定
+#   2. [debounce]        — 訊息緩衝設定
+#   3. [line_bot]        — LINE Bot 設定
+#   4. [templates]       — 系統回覆範本
+#   5. [llm]             — 語言模型設定
+#   6. [[databases]]     — 檢索工具定義（順序 = 優先級）
+#   7. [[agents]]        — Agent 定義
+#   8. [[intents]]       — 意圖路由設定
+#   9. [memory]          — 對話記憶與摘要壓縮
+#  10. [required_slots]  — 必填資訊收集
+#  11. [user_profile]    — 使用者輪廓記憶
 # ==========================================
 
 
 # ==========================================
-# 系統全局設定
+# 1. 系統全局設定
 # ==========================================
 [system]
 domain = "電子鎖、智慧門鎖相關的產品、安裝、故障排除與售後服務"
 
 
 # ==========================================
-# 訊息緩衝設定 (Debounce)
+# 2. 訊息緩衝設定 (Debounce)
 # ==========================================
 [debounce]
-buffer_wait = 1.5                      # 最後一則訊息後等待秒數，新訊息會重設計時器
+buffer_wait = 5.0   # 最後一則訊息後等待秒數，新訊息會重設計時器
 
 
 # ==========================================
-# Line Bot 系統設定
+# 3. LINE Bot 系統設定
 # ==========================================
 [line_bot]
-# Loading 動畫顯示時間 (秒，必須是 5 的倍數，範圍 5~60)
-loading_animation_time = 5
+loading_animation_time = 5   # Loading 動畫顯示時間（秒，必須是 5 的倍數，範圍 5~60）
+
 
 # ==========================================
-# 系統回覆罐頭訊息範本 (Templates)
+# 4. 系統回覆罐頭訊息範本 (Templates)
 # ==========================================
 [templates]
-# 當發生錯誤或需要除錯時的系統提示綴詞
-push_fallback_prefix = "【系統通知】讓您久等了，以下是您的回覆：\n"
-
-
-# ------------------------------------------
-# 語言模型設定 (LLM)
-# ------------------------------------------
-[llm]
-provider = "vertexai"                # 支援的 provider: "ollama"、"gemini" 或 "vertexai"
-model_name = "gemini-2.5-flash"           # Ollama 填 "gemma3:4b"；Gemini 填 "gemini-2.5-flash"；Vertex AI 填 "gemini-2.5-flash"
-temperature = 0.3                  # 數值越低回答越保守穩定 (0.0 ~ 1.0)
-
-# [Gemini 專用設定]
-api_key_env = "GEMINI_API_KEY"     # 請在 .env 中設定此變數
-
-# [Ollama 專用設定]
-base_url = "http://localhost:11434"
-base_url_env = "OLLAMA_BASE_URL"   # 優先讀取環境變數，若環境變數為空，則使用上方 base_url
-
-# [Vertex AI 專用設定] (使用 ADC 驗證，需先執行 gcloud auth application-default login)
-project_id_env = "VERTEX_PROJECT_ID"  # 請在 .env 中設定 GCP 專案 ID
-location_env = "VERTEX_LOCATION"      # 請在 .env 中設定 GCP 區域 (例: us-central1)
-
-
-# ------------------------------------------
-# 檢索節點設定 (Databases / Retrievers)
-# ------------------------------------------
-
-# --- 優先級 1：產品手冊 (Chroma 向量庫) ---
-[[databases]]
-name = "db_smartlock_manual"
-type = "chroma"
-description = "智能門鎖規格、設定與保固手冊"
-path = "./chroma_db_default"
-top_k = 3
-
-# 向量模型設定 (轉成向量時使用的模型)
-embedding_provider = "ollama"
-embedding_model = "nomic-embed-text"
-embedding_base_url = "http://localhost:11434"
-embedding_base_url_env = "OLLAMA_BASE_URL"
-
-# --- 優先級 2：常見故障排除 (Chroma 向量庫) ---
-# (展示如何無痛擴充第二個獨立的向量庫)
-[[databases]]
-name = "db_troubleshooting"
-type = "chroma"
-description = "常見故障排除與維修指南"
-path = "./chroma_db_troubleshoot"
-top_k = 2
-
-# 向量模型設定
-embedding_provider = "ollama"
-embedding_model = "nomic-embed-text"
-embedding_base_url = "http://localhost:11434"
-embedding_base_url_env = "OLLAMA_BASE_URL"
-
-# --- 優先級 3：即時訂單查詢 (RESTful API) ---
-[[databases]]
-name = "db_order_api"
-type = "api"
-description = "查詢即時訂單狀態與報修進度"
-
-# API 連線設定
-endpoint = "https://api.sunnie-lock.com/v1/status" # 公開測試網址
-endpoint_env = "ORDER_API_URL"                     # (優先) 從 .env 讀取真實機密網址
-token_env = "ORDER_API_TOKEN"                      # (選用) 從 .env 讀取 Bearer Token 授權碼
-method = "GET"
-timeout = 5
-
-# API 參數對應
-query_param = "keyword"      # 發送請求時，使用者的問題要放在哪個參數？ (例: ?keyword=問題)
-response_key = "message"     # 接收回傳時，要抓取 JSON 裡的哪一個欄位作為 Context？
-
-
-# --- 優先級 4：網頁搜尋 (Web Search Fallback) ---
-# 作為最後一道防線，當內部資料庫都找不到時上網搜尋
-[[databases]]
-name = "db_web_search"
-type = "web_search"
-description = "網際網路搜尋引擎"
-
-# 搜尋引擎設定
-search_engine = "duckduckgo" # 內建免費、免金鑰的搜尋引擎
-max_results = 3
+push_fallback_prefix = "【系統通知】讓您久等了，以下是您的回覆：\n"   # Reply Token 過期時，Push API 的訊息前綴
 
 
 # ==========================================
-# Agent 定義 (Multi-Agent Architecture)
+# 5. 語言模型設定 (LLM)
+# ==========================================
+[llm]
+provider    = "vertexai"          # 支援: "ollama" | "gemini" | "vertexai"
+model_name  = "gemini-2.5-flash"  # Ollama: "gemma3:4b" / Gemini & Vertex AI: "gemini-2.5-flash"
+temperature = 0.3                 # 數值越低回答越保守穩定 (0.0 ~ 1.0)
+
+# Gemini 專用
+api_key_env = "GEMINI_API_KEY"    # .env 中的 API Key 變數名稱
+
+# Ollama 專用
+base_url     = "http://localhost:11434"
+base_url_env = "OLLAMA_BASE_URL"  # 優先讀取環境變數，若為空則使用上方 base_url
+
+# Vertex AI 專用（需先執行 gcloud auth application-default login）
+project_id_env = "VERTEX_PROJECT_ID"   # .env 中的 GCP 專案 ID
+location_env   = "VERTEX_LOCATION"     # .env 中的 GCP 區域（例: us-central1）
+
+
+# ==========================================
+# 6. 檢索工具定義 (Databases / Retrievers)
+#    陣列順序即為優先級，Agent 透過 tools 欄位引用
+# ==========================================
+
+# --- 優先級 1：產品手冊（Chroma 向量庫）---
+[[databases]]
+name        = "db_smartlock_manual"
+type        = "chroma"
+description = "智能門鎖規格、設定與保固手冊"
+path        = "./chroma_db_default"
+top_k       = 3
+
+embedding_provider     = "ollama"
+embedding_model        = "nomic-embed-text"
+embedding_base_url     = "http://localhost:11434"
+embedding_base_url_env = "OLLAMA_BASE_URL"
+
+# --- 優先級 2：故障排除（Chroma 向量庫）---
+[[databases]]
+name        = "db_troubleshooting"
+type        = "chroma"
+description = "常見故障排除與維修指南"
+path        = "./chroma_db_troubleshoot"
+top_k       = 2
+
+embedding_provider     = "ollama"
+embedding_model        = "nomic-embed-text"
+embedding_base_url     = "http://localhost:11434"
+embedding_base_url_env = "OLLAMA_BASE_URL"
+
+# --- 優先級 3：即時訂單查詢（RESTful API）---
+[[databases]]
+name        = "db_order_api"
+type        = "api"
+description = "查詢即時訂單狀態與報修進度"
+
+endpoint     = "https://api.sunnie-lock.com/v1/status"   # 公開測試網址
+endpoint_env = "ORDER_API_URL"    # （優先）從 .env 讀取真實網址
+token_env    = "ORDER_API_TOKEN"  # （選用）Bearer Token
+method       = "GET"
+timeout      = 5
+
+query_param  = "keyword"    # 使用者問題放入的 query 參數（例: ?keyword=問題）
+response_key = "message"    # 從 JSON 回傳中擷取的欄位名稱
+
+# --- 優先級 4：網頁搜尋（Web Search Fallback）---
+[[databases]]
+name        = "db_web_search"
+type        = "web_search"
+description = "網際網路搜尋引擎"
+
+search_engine = "duckduckgo"   # 內建免費、免金鑰的搜尋引擎
+max_results   = 3
+
+
+# ==========================================
+# 7. Agent 定義 (Multi-Agent Architecture)
+#    每個 Agent 擁有獨立的 prompt 與工具集
 # ==========================================
 
 [[agents]]
-name = "product_expert"
-label = "產品規格專家"
+name        = "product_expert"
+label       = "產品規格專家"
 description = "負責回答產品規格、設定操作、保固相關問題"
-tools = ["db_smartlock_manual", "transfer_to_human"]
+tools       = ["db_smartlock_manual", "transfer_to_human"]
 prompt_file = "agents/prompts/product_expert.md"
 
 [[agents]]
-name = "troubleshooter"
-label = "故障排除專家"
+name        = "troubleshooter"
+label       = "故障排除專家"
 description = "負責診斷設備故障、提供排除步驟"
-tools = ["db_troubleshooting", "transfer_to_human"]
+tools       = ["db_troubleshooting", "transfer_to_human"]
 prompt_file = "agents/prompts/troubleshooter.md"
 
 [[agents]]
-name = "order_clerk"
-label = "訂單查詢專員"
+name        = "order_clerk"
+label       = "訂單查詢專員"
 description = "負責查詢訂單進度、出貨物流、維修進度"
-tools = ["db_order_api", "transfer_to_human"]
+tools       = ["db_order_api", "transfer_to_human"]
 prompt_file = "agents/prompts/order_clerk.md"
 
 [[agents]]
-name = "web_researcher"
-label = "網路搜尋助手"
+name        = "web_researcher"
+label       = "網路搜尋助手"
 description = "當內部資料庫不足時，負責搜尋網路資料"
-tools = ["db_web_search", "transfer_to_human"]
+tools       = ["db_web_search", "transfer_to_human"]
 prompt_file = "agents/prompts/web_researcher.md"
 
 
 # ==========================================
-# 意圖偵測路由設定 (Intent Routing)
+# 8. 意圖偵測路由設定 (Intent Routing)
+#    Router 用 LLM 分類後，依 target 派發至對應 Agent
 # ==========================================
 
 [[intents]]
-name = "order_status"
-label = "查詢訂單或維修進度"
-description = "使用者想查詢訂單進度、出貨狀況、物流狀態或維修進度"
-target = "order_clerk"
+name          = "order_status"
+label         = "查詢訂單或維修進度"
+description   = "使用者想查詢訂單進度、出貨狀況、物流狀態或維修進度"
+target        = "order_clerk"
 require_slots = false
 
 [[intents]]
-name = "troubleshooting"
-label = "設備故障排除"
-description = "使用者遇到設備故障、沒有反應、錯誤代碼或需要排除問題"
-target = "troubleshooter"
+name          = "troubleshooting"
+label         = "設備故障排除"
+description   = "使用者遇到設備故障、沒有反應、錯誤代碼或需要排除問題"
+target        = "troubleshooter"
 require_slots = true
 
 [[intents]]
-name = "general_knowledge"
-label = "產品規格與操作問題"
-description = "關於產品規格、如何設定、一般操作問題，或是其他無法分類的問題"
-target = "product_expert"
+name          = "general_knowledge"
+label         = "產品規格與操作問題"
+description   = "關於產品規格、如何設定、一般操作問題，或是其他無法分類的問題"
+target        = "product_expert"
 require_slots = false
 
 [[intents]]
-name = "web_search"
-label = "網路搜尋"
-description = "使用者詢問市場趨勢、產品比較、推薦等需要即時網路資訊的問題"
-target = "web_researcher"
+name          = "web_search"
+label         = "網路搜尋"
+description   = "使用者詢問市場趨勢、產品比較、推薦等需要即時網路資訊的問題"
+target        = "web_researcher"
 require_slots = false
 
 [[intents]]
-name = "out_of_domain"
-description = "使用者的問題明顯與電子鎖、智慧門鎖完全無關，例如天氣、股票、美食推薦等"
-target = "out_of_domain"
+name          = "out_of_domain"
+description   = "使用者的問題明顯與電子鎖、智慧門鎖完全無關，例如天氣、股票、美食推薦等"
+target        = "out_of_domain"
 require_slots = false
 
 [[intents]]
-name = "transfer_human"
-label = "轉接真人客服"
-description = "使用者明確且堅持要求轉接真人客服（例如直接說『轉接真人』『我要找真人客服』）。僅在使用者主動要求時觸發，不要因為問題困難或資料不足就分類為此意圖。"
-target = "human"
+name          = "transfer_human"
+label         = "轉接真人客服"
+description   = "使用者明確且堅持要求轉接真人客服（例如直接說『轉接真人』『我要找真人客服』）。僅在使用者主動要求時觸發，不要因為問題困難或資料不足就分類為此意圖。"
+target        = "human"
 require_slots = false
+
 
 # ==========================================
-# 對話記憶儲存設定 (Memory / Checkpointer)
+# 9. 對話記憶儲存設定 (Memory / Checkpointer)
+#    manage_memory 節點負責語意摘要壓縮
 # ==========================================
 [memory]
-type = "sqlite"
-path = "./chat_history.db"
-max_messages_threshold = 6
-context_retention_pair = 2
+type                   = "sqlite"            # "memory"（暫存）| "sqlite"（本地持久化）| "postgres"（資料庫）
+path                   = "./chat_history.db"  # sqlite 專用，資料庫檔案路徑
+max_messages_threshold = 10                   # messages 超過此數量時觸發語意摘要壓縮
+context_retention_pair = 2                    # 壓縮後保留最近幾對對話（1 對 = 1 human + 1 ai）
 
 
 # ==========================================
-# 必填資訊收集 (Slot Filling)
+# 10. 必填資訊收集 (Slot Filling)
+#     故障排除前，Agent 會主動詢問缺少的欄位
 # ==========================================
 [required_slots]
 device_model = "使用者的電子鎖型號。"
@@ -218,8 +227,9 @@ device_brand = "使用者的電子鎖品牌。"
 
 
 # ==========================================
-# 使用者輪廓記憶設定 (User Profile Memory)
+# 11. 使用者輪廓記憶設定 (User Profile Memory)
+#     跨對話持久化使用者個人資訊
 # ==========================================
 [user_profile]
-enabled = true
+enabled     = true
 profile_dir = "./user_profiles"
