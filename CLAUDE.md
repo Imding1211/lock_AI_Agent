@@ -23,6 +23,9 @@ python scripts/seed_db.py
 
 # Run mock order API server (for testing db_order_api retriever)
 uvicorn scripts.mock_api:app --port 8001
+
+# View audit logs (recent 30 entries, or specify count)
+python scripts/view_logs.py [count]
 ```
 
 ## Architecture
@@ -32,11 +35,11 @@ uvicorn scripts.mock_api:app --port 8001
 The core is a **StateGraph** compiled in `graph/builder.py`. The flow:
 
 ```
-START → pre_process → router → {agents | out_of_domain | human} → post_process → END
+START → pre_process → manage_memory → router → {agents | out_of_domain | human} → merge_answers → update_profile → post_process → END
 ```
 
 - **`state.py`** — `GraphState` TypedDict with `history` and `chat_history` as append-only (`Annotated[list, operator.add]`) fields
-- **`nodes.py`** — All LangGraph node functions: `pre_process`, `router`, `handle_out_of_domain`, `handle_transfer_human`, `post_process`
+- **`nodes.py`** — All LangGraph node functions: `pre_process`, `manage_memory`, `router`, `handle_out_of_domain`, `handle_transfer_human`, `merge_answers`, `update_profile`, `post_process`
 - **`builder.py`** — Wires nodes and conditional edges; dynamically creates agent subgraphs from `config.toml` `[[agents]]` entries
 
 ### Multi-Agent Architecture
@@ -48,13 +51,16 @@ Each agent is a LLM+Tools subgraph with its own prompt and tool set. The router 
 Nearly everything is configured via `config.toml`, parsed by `core/config.py`:
 - **`[system]`** — Domain definition for the chatbot
 - **`[debounce]`** — Message buffering settings (`buffer_wait` seconds)
-- **`[llm]`** — Provider (`ollama`/`gemini`), model name, temperature
+- **`[llm]`** — Provider (`ollama`/`gemini`/`vertexai`), model name, temperature
 - **`[[databases]]`** — Ordered retriever definitions (type: `chroma`, `api`, `web_search`)
 - **`[[intents]]`** — Intent routing rules mapping intent names to target retriever nodes
 - **`[required_slots]`** — Slot filling requirements (e.g., `device_model`, `device_brand`)
-- **`[memory]`** — Checkpointer type (currently in-memory via `MemorySaver`)
+- **`[memory]`** — Checkpointer type (`memory`/`sqlite`/`postgres`) + summarization config
 - **`[user_profile]`** — User profile persistence settings
-- **`[line_bot]`** / **`[templates]`** — LINE Bot behavior settings
+- **`[user_profile.extraction]`** — Phone/address regex for profile extraction (configurable for i18n)
+- **`[storage]`** — Audit log storage (`sqlite`/`postgres`)
+- **`[prompts]`** — Centralized prompt template file paths
+- **`[line_bot]`** / **`[templates]`** — LINE Bot behavior settings + error message templates
 
 Secrets (API keys, tokens) use `_env` suffix fields that reference `.env` variable names.
 
@@ -68,6 +74,16 @@ Registries:
 - **`retrievers/__init__.py`** — `REGISTRY` maps type strings (`chroma`, `api`, `web_search`) to retriever classes. All retrievers extend `BaseRetriever` (abc) with `setup()` and `async aretrieve()`.
 - **`llms/__init__.py`** — `LLM_REGISTRY` maps provider strings to builder functions
 - **`embeddings/__init__.py`** — `REGISTRY` maps embedding provider strings to builder functions
+- **`storage/__init__.py`** — `STORAGE_REGISTRY` maps storage type strings to builder functions (audit log)
+
+### Shared Constants (`core/constants.py`)
+
+- **`PHONE_REGEX`** / **`ADDRESS_REGEX`** — Compiled regex patterns loaded from `config.toml` `[user_profile.extraction]` with hardcoded fallbacks. Used by `graph/nodes.py` and `tools/__init__.py` for profile data extraction.
+
+### Audit Log (`storage/`)
+
+- **`storage/__init__.py`** — Factory with `get_storage()` / `close_storage()`
+- **`storage/sqlite_impl.py`** — `SqliteAuditStorage` with `log_message(user_id, role, content)`. Roles: `user_raw` (pre-debounce), `user` (merged), `ai` (response)
 
 ### User Profile Management (`profiles/`, `memory/`)
 
@@ -76,7 +92,7 @@ Registries:
 
 ### LINE Bot Integration (`app.py`)
 
-FastAPI webhook at `/webhook`. Implements simple **message buffering** — buffers rapid messages per user, waits `buffer_wait` seconds (new messages reset the timer), then merges and sends to LangGraph. Uses Reply API first, falls back to Push API if the reply token expires.
+FastAPI webhook at `/webhook`. Implements simple **message buffering** — buffers rapid messages per user, waits `buffer_wait` seconds (new messages reset the timer), then merges and sends to LangGraph. Uses Reply API first, falls back to Push API if the reply token expires. Each raw message is logged to the audit log (`user_raw`) before debounce; merged messages are logged as `user`; AI responses as `ai`.
 
 ## Key Conventions
 

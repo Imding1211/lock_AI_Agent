@@ -5,9 +5,11 @@ graph TD
 
     subgraph debounce_layer ["防抖層（app.py）"]
         direction TB
-        webhook["webhook<br/><small>接收 LINE 訊息<br/>顯示 Loading 動畫</small>"]
+        webhook["webhook<br/><small>接收 LINE 訊息<br/>顯示 Loading 動畫<br/>記錄 user_raw 審計日誌</small>"]
         buffer["訊息緩衝池<br/><small>累積多則訊息<br/>新訊息重設計時器<br/>buffer_wait 秒後送出</small>"]
+        langgraph_reply["langgraph_and_reply<br/><small>記錄 user + ai 審計日誌</small>"]
         webhook --> buffer
+        buffer --> langgraph_reply
     end
 
     subgraph supervisor_graph ["Supervisor Graph（LangGraph + SQLite Checkpointer）"]
@@ -65,6 +67,7 @@ graph TD
         prompt_merge[("merge_answers.md<br/><small>多回覆合併</small>")]
         prompt_profile[("update_profile.md<br/><small>輪廓更新</small>")]
         prompt_summarize[("summarize_messages.md<br/><small>語意摘要壓縮</small>")]
+        prompt_transfer[("transfer_human_form.md<br/><small>轉接真人表單</small>")]
     end
 
     subgraph tools_store ["Tools"]
@@ -88,13 +91,14 @@ graph TD
         direction LR
         profile_store[("User Profiles<br/><small>./data/profiles/*.md</small>")]
         sqlite_store[("SQLite<br/><small>./data/db/chat_history.db<br/>Checkpointer + 對話記憶</small>")]
+        audit_store[("SQLite<br/><small>./data/db/audit_log.db<br/>審計日誌</small>")]
     end
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
 
     %% LINE → Debounce → LangGraph
     LINE_USER -->|"傳送訊息"| webhook
-    buffer -->|"buffer_wait 到期"| pre_process
+    langgraph_reply -->|"合併訊息"| pre_process
 
     %% Main flow
     pre_process --> manage_memory
@@ -119,9 +123,11 @@ graph TD
     human --> merge_answers
     merge_answers --> update_profile
     update_profile --> post_process
-    post_process -->|"Reply / Push API"| LINE_USER
+    post_process -->|"answer"| langgraph_reply
+    langgraph_reply -->|"Reply / Push API"| LINE_USER
 
     %% Prompt → node connections
+    prompt_transfer --- human
     prompt_summarize --- manage_memory
     prompt_router --- router
     prompt_pe --- PE_LLM
@@ -151,6 +157,8 @@ graph TD
     pre_process -.->|"載入"| profile_store
     update_profile -.->|"儲存"| profile_store
     manage_memory -.->|"讀寫摘要"| sqlite_store
+    webhook -.->|"user_raw"| audit_store
+    langgraph_reply -.->|"user + ai"| audit_store
 
     %% LLM connections
     LLM_ENGINE -..- manage_memory
@@ -184,7 +192,8 @@ graph TD
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
-    class profile_store,sqlite_store persist
+    class profile_store,sqlite_store,audit_store persist
     class LLM_ENGINE llm_style
-    class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize prompt_style
+    class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
+    class langgraph_reply debounce
     class tool_manual,tool_trouble,tool_order,tool_web,tool_transfer tool_style

@@ -7,20 +7,21 @@
 - **多 Agent 架構**：Router 意圖分類 → 專職 Agent 子圖（product_expert / troubleshooter / order_clerk / web_researcher）
 - **多意圖平行派發**：Send() fan-out，一則訊息可同時觸發多個 Agent 並行處理
 - **自主解決優先**：Agent 竭盡所能自主解決，僅在使用者明確堅持或涉及安全風險時轉接真人
-- **對話記憶**：跨回合 chat_history + 話題偵測 session 遞增
+- **對話記憶**：SQLite 持久化 + 語意摘要壓縮（manage_memory），跨 session 不遺失
 - **使用者輪廓**：自動萃取並持久化使用者設備、地址、電話等個資
+- **審計日誌**：即時記錄原始訊息（user_raw）+ 合併訊息（user）+ AI 回覆（ai），完整審計軌跡
 - **訊息防抖**：LINE 訊息緩衝合併，計時器重設機制避免碎片化處理
-- **設定驅動**：透過 `config.toml` 管理所有設定，無需改程式碼即可擴充
+- **設定驅動**：透過 `config.toml` 管理所有設定（含 regex、prompt 路徑），無需改程式碼即可擴充
 
 ## 系統架構
 
 ```
-START → pre_process → router →  product_expert  ─┐
-                            →  troubleshooter   ─┤
-                            →  order_clerk       ─┤→ post_process → END
-                            →  web_researcher   ─┤
-                            →  out_of_domain     ─┤
-                            →  transfer_human    ─┘
+START → pre_process → manage_memory → router →  product_expert  ─┐
+                                             →  troubleshooter   ─┤
+                                             →  order_clerk       ─┤→ merge_answers → update_profile → post_process → END
+                                             →  web_researcher   ─┤
+                                             →  out_of_domain     ─┤
+                                             →  transfer_human    ─┘
 ```
 
 ## 快速開始
@@ -65,6 +66,9 @@ uvicorn app:app --reload
 # Mock 訂單 API（測試用）
 uvicorn scripts.mock_api:app --port 8001
 
+# 查看審計日誌
+python scripts/view_logs.py
+
 # 執行測試
 python -m pytest tests/test_debounce.py
 ```
@@ -88,12 +92,13 @@ python -m pytest tests/test_debounce.py
 ├── data/                   # 動態資料（db、profiles，gitignore）
 ├── scripts/                # 輔助腳本 (seed_db, mock_api)
 ├── docs/                   # 文件（reports / manuals / assets）
-├── core/                   # 核心模組 (設定解析、防抖)
+├── core/                   # 核心模組 (設定解析、共用常數)
 ├── graph/                  # LangGraph 管線 (state, nodes, builder)
 ├── llms/                   # LLM 供應商 (ollama, gemini, vertexai)
 ├── embeddings/             # Embedding 供應商
 ├── retrievers/             # 檢索器 (chroma, api, web_search)
 ├── memory/                 # 對話記憶 checkpointer
 ├── profiles/               # 使用者輪廓管理
+├── storage/                # 審計日誌 (SQLite/PostgreSQL)
 └── tests/                  # 測試
 ```
