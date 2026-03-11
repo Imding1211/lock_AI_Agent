@@ -6,7 +6,7 @@
 
 ## 1. RAG 知識庫資料準備 (Vector DB)
 
-系統透過 `seed_db.py` 讀取 `documents/` 目錄下的內容，將其轉化為 ChromaDB 向量庫。
+系統透過 `scripts/seed_db.py` 讀取 `documents/` 目錄下的內容，將其轉化為 ChromaDB 向量庫。
 
 ### 1.1 資料格式規範
 *   **格式**：建議使用 `.md` 或 `.txt`。
@@ -16,12 +16,12 @@
 ### 1.2 資料分割 (Chunking) 建議
 *   目前使用 `RecursiveCharacterTextSplitter`。
 *   `chunk_size` 設為 500，`chunk_overlap` 設為 50。
-*   若要更改分割策略，請至 `seed_db.py` 進行調整。
+*   若要更改分割策略，請至 `scripts/seed_db.py` 進行調整。
 
 ### 1.3 更新知識庫流程
 1.  將新文件放入 `documents/` 子目錄下。
-2.  刪除對應的資料庫資料夾（例如 `./chroma_db_default`）。
-3.  重新執行 `python seed_db.py`。
+2.  刪除對應的資料庫資料夾（例如 `./data/db/chroma_db_default`）。
+3.  重新執行 `python scripts/seed_db.py`。
 
 ---
 

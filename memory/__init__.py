@@ -15,7 +15,7 @@ async def get_checkpointer(config: dict):
     elif memory_type == "sqlite":
         import aiosqlite
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-        db_path = config.get("path", "./chat_history.db")
+        db_path = config.get("path", "./data/db/chat_history.db")
         conn = await aiosqlite.connect(db_path)
         _sqlite_conn = conn
         saver = AsyncSqliteSaver(conn)

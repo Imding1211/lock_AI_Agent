@@ -6,7 +6,7 @@ from pathlib import Path
 class ProfileManager:
     def __init__(self, config: dict):
         self.enabled = config.get("enabled", False)
-        self.base_dir = Path(config.get("profile_dir", "./user_profiles"))
+        self.base_dir = Path(config.get("profile_dir", "./data/profiles"))
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_profile_path(self, user_id: str) -> Path:

@@ -114,7 +114,7 @@ location_env = "VERTEX_LOCATION"      # GCP 區域 (例: us-central1)
 name = "db_smartlock_manual"             # 唯一名稱，供 Agent tools 綁定
 type = "chroma"                          # 檢索器類型
 description = "智能門鎖規格、設定與保固手冊"  # Agent 看到的工具描述
-path = "./chroma_db_default"             # 資料庫本機路徑
+path = "./data/db/chroma_db_default"     # 資料庫本機路徑
 top_k = 3                               # 每次檢索取回最相關的幾筆資料
 
 # 向量模型設定
@@ -259,7 +259,7 @@ require_slots = false                # 是否需要先完成槽位填充
 ```toml
 [memory]
 type = "sqlite"                    # 可選: "memory" (暫存), "sqlite" (本地持久化), "postgres" (資料庫持久化)
-path = "./chat_history.db"         # sqlite 專用，資料庫檔案路徑
+path = "./data/db/chat_history.db"  # sqlite 專用，資料庫檔案路徑
 max_messages_threshold = 6         # messages 超過此數量時觸發語意摘要壓縮
 context_retention_pair = 2         # 壓縮後保留最近幾對 (human+ai) 訊息
 ```
@@ -299,7 +299,7 @@ device_brand = "使用者的電子鎖品牌。"
 ```toml
 [user_profile]
 enabled = true                     # 是否啟用輪廓功能
-profile_dir = "./user_profiles"    # 輪廓檔案儲存目錄
+profile_dir = "./data/profiles"    # 輪廓檔案儲存目錄
 ```
 
 | 參數 | 說明 |

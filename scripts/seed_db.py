@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import shutil
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
@@ -267,7 +271,7 @@ def seed_databases():
 
     for db in DB_CONFIG:
         if db.get("type") == "chroma":
-            db_path = db.get("path", "./chroma_db_default")
+            db_path = db.get("path", "./data/db/chroma_db_default")
 
             # 清除舊的資料庫檔案，確保資料乾淨
             try:

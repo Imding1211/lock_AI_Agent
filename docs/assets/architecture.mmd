@@ -86,8 +86,8 @@ graph TD
 
     subgraph persistence ["持久化儲存"]
         direction LR
-        profile_store[("User Profiles<br/><small>./user_profiles/*.md</small>")]
-        sqlite_store[("SQLite<br/><small>./chat_history.db<br/>Checkpointer + 對話記憶</small>")]
+        profile_store[("User Profiles<br/><small>./data/profiles/*.md</small>")]
+        sqlite_store[("SQLite<br/><small>./data/db/chat_history.db<br/>Checkpointer + 對話記憶</small>")]
     end
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]

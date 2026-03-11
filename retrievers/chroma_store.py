@@ -6,7 +6,7 @@ from embeddings import get_embedding
 
 class ChromaRetriever(BaseRetriever):
     def setup(self):
-        db_path = self.config.get("path", "./chroma_db_default")
+        db_path = self.config.get("path", "./data/db/chroma_db_default")
         self.top_k = self.config.get("top_k", 2)
 
         embed_fn = get_embedding(self.config)

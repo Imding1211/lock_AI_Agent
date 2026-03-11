@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
         # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
-
+        """
         # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
         await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
 
@@ -132,10 +132,11 @@ if __name__ == "__main__":
             "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
             thread_id="demo_human"
         )
+        """
 
         # --- SQLite 持久化驗證 ---
         print("=" * 40)
-        db_path = "./chat_history.db"
+        db_path = "./data/db/chat_history.db"
         if os.path.exists(db_path):
             print(f"[SQLite] {db_path} = {os.path.getsize(db_path):,} bytes")
 
@@ -149,5 +150,5 @@ if __name__ == "__main__":
                 print(f"[摘要] {summary}")
 
         await close_checkpointer()
-
+        
     asyncio.run(main())

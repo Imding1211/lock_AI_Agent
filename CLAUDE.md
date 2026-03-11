@@ -19,14 +19,10 @@ uvicorn app:app --reload
 python main.py
 
 # Seed ChromaDB with demo data (clears and rebuilds both vector stores)
-python seed_db.py
-
-# Build individual vector databases from raw documents
-python build_default_db.py       # -> ./chroma_db_default
-python build_troubleshoot_db.py  # -> ./chroma_db_troubleshoot
+python scripts/seed_db.py
 
 # Run mock order API server (for testing db_order_api retriever)
-uvicorn mock_api:app --port 8001
+uvicorn scripts.mock_api:app --port 8001
 ```
 
 ## Architecture
@@ -75,7 +71,7 @@ Registries:
 
 ### User Profile Management (`profiles/`, `memory/`)
 
-- **`profiles/manager.py`** — Persists user conversation state to `user_profiles/` directory
+- **`profiles/manager.py`** — Persists user conversation state to `data/profiles/` directory
 - **`memory/__init__.py`** — `get_checkpointer()` factory supporting `MemorySaver`, `SqliteSaver`, and PostgreSQL backends
 
 ### LINE Bot Integration (`app.py`)

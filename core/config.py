@@ -16,7 +16,7 @@ def load_config(file_path="config.toml"):
             data.get("system", {"domain": "電子鎖"}),
             data.get("line_bot", {"loading_animation_time": 5}),
             data.get("templates", {"push_fallback_prefix": "【系統通知】讓您久等了，以下是您的回覆：\n"}),
-            data.get("user_profile", {"enabled": False, "profile_dir": "./user_profiles"}),
+            data.get("user_profile", {"enabled": False, "profile_dir": "./data/profiles"}),
             data.get("debounce", {"buffer_wait": 1.5}),
             data.get("agents", [])
         )

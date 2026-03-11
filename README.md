@@ -46,7 +46,7 @@ LINE_CHANNEL_ACCESS_TOKEN="your-line-channel-access-token"
 ### 3. 建立向量資料庫
 
 ```bash
-python seed_db.py
+python scripts/seed_db.py
 ```
 
 ### 4. 執行
@@ -62,12 +62,8 @@ uvicorn app:app --reload
 ## 其他指令
 
 ```bash
-# 單獨建立向量資料庫
-python build_default_db.py        # → ./chroma_db_default
-python build_troubleshoot_db.py   # → ./chroma_db_troubleshoot
-
 # Mock 訂單 API（測試用）
-uvicorn mock_api:app --port 8001
+uvicorn scripts.mock_api:app --port 8001
 
 # 執行測試
 python -m pytest tests/test_debounce.py
@@ -89,8 +85,9 @@ python -m pytest tests/test_debounce.py
 ├── app.py                  # LINE Bot FastAPI webhook
 ├── main.py                 # CLI 測試入口
 ├── config.toml             # 系統設定檔
-├── seed_db.py              # 向量資料庫初始化
-├── mock_api.py             # Mock 訂單 API
+├── data/                   # 動態資料（db、profiles，gitignore）
+├── scripts/                # 輔助腳本 (seed_db, mock_api)
+├── docs/                   # 文件（reports / manuals / assets）
 ├── core/                   # 核心模組 (設定解析、防抖)
 ├── graph/                  # LangGraph 管線 (state, nodes, builder)
 ├── llms/                   # LLM 供應商 (ollama, gemini, vertexai)
@@ -98,6 +95,5 @@ python -m pytest tests/test_debounce.py
 ├── retrievers/             # 檢索器 (chroma, api, web_search)
 ├── memory/                 # 對話記憶 checkpointer
 ├── profiles/               # 使用者輪廓管理
-├── tests/                  # 測試
-└── docs/                   # 開發文件與架構圖
+└── tests/                  # 測試
 ```
