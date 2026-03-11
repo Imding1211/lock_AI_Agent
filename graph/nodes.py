@@ -2,8 +2,10 @@ from langchain_core.messages import HumanMessage, SystemMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from core.config import (
     LLM_CONFIG, INTENTS_CONFIG,
-    SYSTEM_CONFIG, USER_PROFILE_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
+    SYSTEM_CONFIG, USER_PROFILE_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG,
+    PROMPTS_CONFIG, TEMPLATES_CONFIG,
 )
+from core.constants import PHONE_REGEX, ADDRESS_REGEX
 from profiles import ProfileManager
 from graph.state import GraphState
 from llms import get_llm
@@ -89,7 +91,7 @@ async def manage_memory(state: GraphState, config: RunnableConfig):
     domain = SYSTEM_CONFIG.get("domain", "電子鎖")
 
     summarize_prompt = load_prompt_template(
-        "agents/prompts/summarize_messages.md",
+        PROMPTS_CONFIG.get("summarizer", "agents/prompts/summarize_messages.md"),
         domain=domain,
         existing_summary=existing_summary if existing_summary else "(無既有摘要)",
     )
@@ -130,7 +132,7 @@ async def router(state: GraphState, config: RunnableConfig):
 
     # 載入 router prompt
     router_prompt = load_prompt_template(
-        "agents/prompts/router.md",
+        PROMPTS_CONFIG.get("router", "agents/prompts/router.md"),
         domain=domain,
         intent_list=intent_list,
     )
@@ -208,33 +210,23 @@ async def handle_transfer_human(state: GraphState, config: RunnableConfig):
     current_question = state.get("question", "")
     combined_text = f"{user_profile}\n{current_question}"
 
-    import re
     phone = ""
     address = ""
     brand_model = ""
-    phone_match = re.search(r'09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}', combined_text)
+    phone_match = PHONE_REGEX.search(combined_text)
     if phone_match:
         phone = phone_match.group()
-    addr_match = re.search(
-        r'[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[\u4e00-\u9fff\d\s\-]*(?:路|街|巷|弄|號|樓)[\u4e00-\u9fff\d\s\-]*',
-        combined_text
-    )
+    addr_match = ADDRESS_REGEX.search(combined_text)
     if addr_match:
         address = addr_match.group().strip()
 
     has_info = any([brand_model, phone, address])
-    if has_info:
-        header = "您好\n麻煩您確認並補充以下資訊"
-    else:
-        header = "您好\n麻煩您留下以下資訊"
+    header = "您好\n麻煩您確認並補充以下資訊" if has_info else "您好\n麻煩您留下以下資訊"
 
-    answer = (
-        f"{header}\n"
-        f"聯絡地址：{address}\n"
-        f"電話：{phone}\n"
-        f"設備品牌型號：{brand_model}\n"
-        f"安裝日期：\n"
-        f"另外再麻煩您錄影整個狀況的影片將其上傳，謝謝您"
+    transfer_form_path = PROMPTS_CONFIG.get("transfer_form", "agents/prompts/transfer_human_form.md")
+    answer = load_prompt_template(
+        transfer_form_path,
+        header=header, address=address, phone=phone, brand_model=brand_model,
     )
 
     return {
@@ -292,7 +284,7 @@ async def merge_answers(state: GraphState):
                 print(f"  [merge_answers] 合併 {len(ai_answers)} 段 agent 回覆...")
                 domain = SYSTEM_CONFIG.get("domain", "電子鎖")
                 merge_prompt = load_prompt_template(
-                    "agents/prompts/merge_answers.md",
+                    PROMPTS_CONFIG.get("merger", "agents/prompts/merge_answers.md"),
                     domain=domain,
                 )
                 parts = "\n\n---\n\n".join([f"【回覆 {i+1}】\n{a}" for i, a in enumerate(ai_answers)])
@@ -302,7 +294,7 @@ async def merge_answers(state: GraphState):
                 answer = merge_response.content.strip()
 
     if not answer:
-        answer = "抱歉，系統沒有產生回覆。"
+        answer = TEMPLATES_CONFIG.get("error_no_reply", "抱歉，系統沒有產生回覆。")
 
     print(f"  [merge_answers] 最終回覆: {answer[:10]}...")
 
@@ -349,7 +341,7 @@ async def update_profile(state: GraphState, config: RunnableConfig):
         domain = SYSTEM_CONFIG.get("domain", "電子鎖")
 
         prompt = load_prompt_template(
-            "agents/prompts/update_profile.md",
+            PROMPTS_CONFIG.get("profile_updater", "agents/prompts/update_profile.md"),
             domain=domain,
             existing_profile=existing_profile if existing_profile else "(empty - new user)",
             question=question,

@@ -19,9 +19,11 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
-from core.config import LINE_BOT_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG
+from core.config import LINE_BOT_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG, SYSTEM_CONFIG, STORAGE_CONFIG
 
 from graph.builder import build_graph
+from storage import get_storage, close_storage
+from memory import close_checkpointer
 
 # 載入環境變數 (.env)
 load_dotenv()
@@ -37,21 +39,21 @@ configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 # 訊息緩衝池：用來記錄每個使用者的狀態
 user_buffers = {}
 
-# LangGraph 執行超時（秒）
-LANGGRAPH_TIMEOUT = 60
+# 從 config 讀取設定（去硬編碼）
+LANGGRAPH_TIMEOUT = SYSTEM_CONFIG.get("request_timeout", 60)
+BUFFER_TTL_SECONDS = DEBOUNCE_CONFIG.get("buffer_ttl", 300)
+BUFFER_CLEANUP_INTERVAL = DEBOUNCE_CONFIG.get("cleanup_interval", 60)
 
-# Buffer TTL 設定
-BUFFER_TTL_SECONDS = 300
-BUFFER_CLEANUP_INTERVAL = 60
-
-# LangGraph app（在 startup 事件中非同步初始化）
+# LangGraph app 與審計日誌（在 startup 事件中非同步初始化）
 langgraph_app = None
+audit_storage = None
 
 async def run_langgraph(user_id: str, user_text: str) -> tuple[str, list]:
     """將使用者訊息送入 LangGraph，並利用 user_id 維持對話記憶"""
     try:
         # 1. 設定對話的 Thread ID（固定格式，SQLite 持久化）
-        thread_id = f"smart_lock_{user_id}"
+        thread_prefix = SYSTEM_CONFIG.get("thread_prefix", "smart_lock_")
+        thread_id = f"{thread_prefix}{user_id}"
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -77,17 +79,17 @@ async def run_langgraph(user_id: str, user_text: str) -> tuple[str, list]:
             )
         except asyncio.TimeoutError:
             print(f"[LangGraph 超時] {user_id} 的問題處理超過 {LANGGRAPH_TIMEOUT} 秒")
-            return "不好意思，系統處理時間過長，請稍後再試一次。如果問題持續，建議轉接真人客服。", []
+            return TEMPLATES_CONFIG.get("error_timeout", "不好意思，系統處理時間過長，請稍後再試一次。如果問題持續，建議轉接真人客服。"), []
 
         # 5. 取出 answer，並只回傳本次 run 新增的 history items
-        final_answer = result_state.get("answer", "抱歉，系統沒有產生回覆。")
+        final_answer = result_state.get("answer", TEMPLATES_CONFIG.get("error_no_reply", "抱歉，系統沒有產生回覆。"))
         full_history = result_state.get("history", [])
         current_history = full_history[prev_history_len:]
         return final_answer, current_history
 
     except Exception as e:
         print(f"[LangGraph 執行錯誤] {e}")
-        return "不好意思，系統大腦剛剛稍微當機了一下，請稍後再試一次！", []
+        return TEMPLATES_CONFIG.get("error_system", "不好意思，系統大腦剛剛稍微當機了一下，請稍後再試一次！"), []
 
 async def send_line_message(user_id: str, reply_token: str, message_text: str):
     """嘗試 Reply API，失敗則降級 Push API"""
@@ -118,8 +120,24 @@ async def send_line_message(user_id: str, reply_token: str, message_text: str):
 async def langgraph_and_reply(user_id: str, reply_token: str, text: str):
     """執行 LangGraph 並回覆使用者"""
     print(f"\n[開始處理] 準備將 '{text}' 送入 LangGraph...")
+
+    # 審計日誌：記錄使用者原始訊息
+    if audit_storage:
+        try:
+            await audit_storage.log_message(user_id, "user", text)
+        except Exception as e:
+            print(f"[Audit] 記錄使用者訊息失敗: {e}")
+
     ai_response, history = await run_langgraph(user_id, text)
     print(f"[LangGraph] 思考完畢！準備回傳...")
+
+    # 審計日誌：記錄 AI 回覆
+    if audit_storage:
+        try:
+            await audit_storage.log_message(user_id, "ai", ai_response)
+        except Exception as e:
+            print(f"[Audit] 記錄 AI 回覆失敗: {e}")
+
     await send_line_message(user_id, reply_token, ai_response)
 
 
@@ -158,9 +176,15 @@ async def cleanup_stale_buffers():
 
 @app.on_event("startup")
 async def startup_event():
-    global langgraph_app
+    global langgraph_app, audit_storage
+    audit_storage = await get_storage(STORAGE_CONFIG)
     langgraph_app = await build_graph()
     asyncio.create_task(cleanup_stale_buffers())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await close_storage()
+    await close_checkpointer()
 
 @app.post("/webhook")
 async def line_webhook(request: Request):
@@ -184,6 +208,13 @@ async def line_webhook(request: Request):
         new_token = event.reply_token
 
         print(f"[收到訊息] '{new_text}' (Token: {new_token})")
+
+        # 審計日誌：即時記錄使用者原始訊息（debounce 之前）
+        if audit_storage:
+            try:
+                await audit_storage.log_message(user_id, "user_raw", new_text)
+            except Exception as e:
+                print(f"[Audit] 記錄原始訊息失敗: {e}")
 
         loading_time = LINE_BOT_CONFIG.get("loading_animation_time", 5)
         async with AsyncApiClient(configuration) as api_client:

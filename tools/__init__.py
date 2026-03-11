@@ -1,9 +1,10 @@
 import asyncio
-import re
 from langchain_core.tools import StructuredTool
-from core.config import DB_CONFIG, SYSTEM_CONFIG, USER_PROFILE_CONFIG
+from core.config import DB_CONFIG, SYSTEM_CONFIG, USER_PROFILE_CONFIG, PROMPTS_CONFIG
+from core.constants import PHONE_REGEX, ADDRESS_REGEX
 from retrievers import get_retriever
 from profiles import ProfileManager
+from agents import load_prompt_template
 
 profile_manager = ProfileManager(USER_PROFILE_CONFIG)
 
@@ -45,29 +46,20 @@ def _build_transfer_to_human_tool() -> StructuredTool:
         address = ""
         brand_model = ""
         if user_profile:
-            phone_match = re.search(r'09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}', user_profile)
+            phone_match = PHONE_REGEX.search(user_profile)
             if phone_match:
                 phone = phone_match.group()
-            addr_match = re.search(
-                r'[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[\u4e00-\u9fff\d\s\-]*(?:路|街|巷|弄|號|樓)[\u4e00-\u9fff\d\s\-]*',
-                user_profile
-            )
+            addr_match = ADDRESS_REGEX.search(user_profile)
             if addr_match:
                 address = addr_match.group().strip()
 
         has_info = any([brand_model, phone, address])
-        if has_info:
-            header = "您好\n麻煩您確認並補充以下資訊"
-        else:
-            header = "您好\n麻煩您留下以下資訊"
+        header = "您好\n麻煩您確認並補充以下資訊" if has_info else "您好\n麻煩您留下以下資訊"
 
-        answer = (
-            f"{header}\n"
-            f"聯絡地址：{address}\n"
-            f"電話：{phone}\n"
-            f"設備品牌型號：{brand_model}\n"
-            f"安裝日期：\n"
-            f"另外再麻煩您錄影整個狀況的影片將其上傳，謝謝您"
+        transfer_form_path = PROMPTS_CONFIG.get("transfer_form", "agents/prompts/transfer_human_form.md")
+        answer = load_prompt_template(
+            transfer_form_path,
+            header=header, address=address, phone=phone, brand_model=brand_model,
         )
         return answer
 
