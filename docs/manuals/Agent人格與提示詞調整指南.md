@@ -48,7 +48,17 @@
 ### 3.3 回覆合併策略 (`merge_answers.md`)
 當使用者同時問「規格」與「訂單」時：
 *   不要分開回覆兩次「您好」。
-*   應以結構化方式（如分段、標點、甚至表格）將兩個 Agent 的回報結果融合成一篇專業的應對。
+*   應以結構化方式（如分段、標點）將兩個 Agent 的回報結果融合成一篇專業的應對。
+
+### 3.4 純文字格式規範（LINE 平台適配）
+LINE 平台不支援 Markdown 渲染，因此所有面向使用者的 Agent Prompt 必須包含以下規則：
+> 「回覆格式必須是純文字，禁止使用任何 Markdown 語法（如 ** 粗體、# 標題、[]() 連結、` 程式碼）。排版請用換行與數字編號（1. 2. 3.）即可。」
+
+此規則適用於：`product_expert.md`、`troubleshooter.md`、`order_clerk.md`、`web_researcher.md`、`merge_answers.md`。
+
+不適用於：`router.md`（輸出為意圖名稱）、`summarize_messages.md`（內部摘要）、`update_profile.md`（輸出為 Markdown 格式的 user profile）。
+
+作為結尾防線，`graph/nodes.py` 的 `post_process` 節點會透過 `_strip_markdown()` 函數以 regex 清洗殘留的 Markdown 標記，確保最終回覆為純文字。
 
 ---
 

@@ -1,3 +1,4 @@
+import re
 from langchain_core.messages import HumanMessage, SystemMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from core.config import (
@@ -362,10 +363,25 @@ async def update_profile(state: GraphState, config: RunnableConfig):
     }
 
 
+def _strip_markdown(text: str) -> str:
+    """移除常見 Markdown 標記，保留換行與純文字。"""
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)   # # 標題
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)                 # **粗體**
+    text = re.sub(r'__(.+?)__', r'\1', text)                     # __粗體__
+    text = re.sub(r'\*(.+?)\*', r'\1', text)                     # *斜體*
+    text = re.sub(r'_(.+?)_', r'\1', text)                       # _斜體_
+    text = re.sub(r'~~(.+?)~~', r'\1', text)                     # ~~刪除線~~
+    text = re.sub(r'`(.+?)`', r'\1', text)                       # `行內程式碼`
+    text = re.sub(r'^\s*[-*]\s+', '', text, flags=re.MULTILINE)  # - 或 * 無序列表符號
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)         # [文字](連結)
+    return text.strip()
+
+
 async def post_process(state: GraphState):
     """回傳最終 answer"""
     print("  [post_process] 回傳最終回覆...")
     answer = state.get("answer", "")
+    answer = _strip_markdown(answer)
     return {
         "answer": answer,
         "history": ["post_process"]
