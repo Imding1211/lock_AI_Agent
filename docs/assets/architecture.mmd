@@ -95,6 +95,7 @@ graph TD
     end
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
+    EMBEDDING_ENGINE["Embedding Engine<br/><small>Ollama nomic-embed-text<br/>config.toml [embedding]</small>"]
 
     %% LINE → Debounce → LangGraph
     LINE_USER -->|"傳送訊息"| webhook
@@ -160,6 +161,10 @@ graph TD
     webhook -.->|"user_raw"| audit_store
     langgraph_reply -.->|"user + ai"| audit_store
 
+    %% Embedding connections
+    EMBEDDING_ENGINE -..- chroma_manual
+    EMBEDDING_ENGINE -..- chroma_trouble
+
     %% LLM connections
     LLM_ENGINE -..- manage_memory
     LLM_ENGINE -..- router
@@ -193,7 +198,7 @@ graph TD
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
     class profile_store,sqlite_store,audit_store persist
-    class LLM_ENGINE llm_style
+    class LLM_ENGINE,EMBEDDING_ENGINE llm_style
     class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
     class langgraph_reply debounce
     class tool_manual,tool_trouble,tool_order,tool_web,tool_transfer tool_style

@@ -21,8 +21,9 @@ def load_config(file_path="config.toml"):
             data.get("agents", []),
             data.get("storage", {"type": "sqlite", "sqlite_path": "./data/db/audit_log.db"}),
             data.get("prompts", {}),
+            data.get("embedding", {"provider": "ollama"}),
         )
 
-DB_CONFIG, LLM_CONFIG, INTENTS_CONFIG, MEMORY_CONFIG, REQUIRED_SLOTS, SYSTEM_CONFIG, LINE_BOT_CONFIG, TEMPLATES_CONFIG, USER_PROFILE_CONFIG, DEBOUNCE_CONFIG, AGENTS_CONFIG, STORAGE_CONFIG, PROMPTS_CONFIG = load_config()
+DB_CONFIG, LLM_CONFIG, INTENTS_CONFIG, MEMORY_CONFIG, REQUIRED_SLOTS, SYSTEM_CONFIG, LINE_BOT_CONFIG, TEMPLATES_CONFIG, USER_PROFILE_CONFIG, DEBOUNCE_CONFIG, AGENTS_CONFIG, STORAGE_CONFIG, PROMPTS_CONFIG, EMBEDDING_CONFIG = load_config()
 
 EXTRACTION_CONFIG = USER_PROFILE_CONFIG.get("extraction", {})

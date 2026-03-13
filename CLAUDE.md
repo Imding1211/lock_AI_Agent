@@ -52,6 +52,7 @@ Nearly everything is configured via `config.toml`, parsed by `core/config.py`:
 - **`[system]`** — Domain definition for the chatbot
 - **`[debounce]`** — Message buffering settings (`buffer_wait` seconds)
 - **`[llm]`** — Provider (`ollama`/`gemini`/`vertexai`), model name, temperature
+- **`[embedding]`** — Global embedding engine settings (provider, model, base_url); all vector retrievers auto-fallback to this
 - **`[[databases]]`** — Ordered retriever definitions (type: `chroma`, `api`, `web_search`)
 - **`[[intents]]`** — Intent routing rules mapping intent names to target retriever nodes
 - **`[required_slots]`** — Slot filling requirements (e.g., `device_model`, `device_brand`)
