@@ -1,12 +1,12 @@
 import os
 import httpx
-from .base import BaseRetriever
+from .base_retriever import BaseRetriever
 
 class APIStoreRetriever(BaseRetriever):
     def setup(self):
         env_url_name = self.config.get("endpoint_env")
         self.endpoint = os.getenv(env_url_name) or self.config.get("endpoint")
-        
+
         env_token_name = self.config.get("token_env")
         self.api_token = os.getenv(env_token_name)
 
@@ -14,7 +14,7 @@ class APIStoreRetriever(BaseRetriever):
         self.timeout = self.config.get("timeout", 5)
         self.query_param = self.config.get("query_param", "q")
         self.response_key = self.config.get("response_key", "data")
-        
+
         print(f"[*] 初始化 Async API 模組: 準備連線至 {self.endpoint} ...")
 
     async def aretrieve(self, question: str) -> str:
@@ -42,4 +42,3 @@ class APIStoreRetriever(BaseRetriever):
             return f"API 連線發生錯誤: {e}"
         except Exception as e:
             return f"API 解析發生異常: {e}"
-            

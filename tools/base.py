@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
+from langchain_core.tools import StructuredTool
 
-class BaseRetriever(ABC):
+
+class BaseTool(ABC):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.setup()
@@ -11,5 +13,5 @@ class BaseRetriever(ABC):
         pass
 
     @abstractmethod
-    async def aretrieve(self, question: str) -> str:
+    def as_langchain_tool(self) -> StructuredTool:
         pass

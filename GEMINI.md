@@ -88,6 +88,6 @@ python seed_db.py
 - `app.py`: FastAPI 入口，處理 LINE Webhook、訊息緩衝與 Loading 動畫。
 - `graph/builder.py`: LangGraph 圖表的核心建構邏輯。
 - `graph/nodes.py`: 各個節點（Router, Agent, Post-process）的具體實作。
-- `retrievers/`: 封裝了 ChromaDB、API 與 Web Search 的檢索邏輯。
+- `tools/`: 封裝了 ChromaDB、API、Web Search 的檢索邏輯與 transfer_to_human 工具（一檔案一工具）。
 - `core/config.py`: 負責解析 `config.toml` 並提供全域配置物件。
 - `user_profiles/`: 存放持久化的使用者個人化資訊 (JSON 格式)。

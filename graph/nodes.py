@@ -6,14 +6,15 @@ from core.config import (
     SYSTEM_CONFIG, USER_PROFILE_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG,
     PROMPTS_CONFIG, TEMPLATES_CONFIG,
 )
-from core.constants import PHONE_REGEX, ADDRESS_REGEX
 from profiles import ProfileManager
+from tools.transfer_human import TransferHumanTool
 from graph.state import GraphState
 from llms import get_llm
 from agents import load_prompt_template
 
 llm = get_llm(LLM_CONFIG)
 profile_manager = ProfileManager(USER_PROFILE_CONFIG)
+_transfer_tool = TransferHumanTool({})
 
 
 async def pre_process(state: GraphState, config: RunnableConfig):
@@ -206,30 +207,8 @@ async def handle_transfer_human(state: GraphState, config: RunnableConfig):
     print("  [transfer_human] 正在準備轉接...")
     cfg = config.get("configurable", {})
     user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
-
-    user_profile = await profile_manager.load_profile(user_id)
     current_question = state.get("question", "")
-    combined_text = f"{user_profile}\n{current_question}"
-
-    phone = ""
-    address = ""
-    brand_model = ""
-    phone_match = PHONE_REGEX.search(combined_text)
-    if phone_match:
-        phone = phone_match.group()
-    addr_match = ADDRESS_REGEX.search(combined_text)
-    if addr_match:
-        address = addr_match.group().strip()
-
-    has_info = any([brand_model, phone, address])
-    header = "您好\n麻煩您確認並補充以下資訊" if has_info else "您好\n麻煩您留下以下資訊"
-
-    transfer_form_path = PROMPTS_CONFIG.get("transfer_form", "agents/prompts/transfer_human_form.md")
-    answer = load_prompt_template(
-        transfer_form_path,
-        header=header, address=address, phone=phone, brand_model=brand_model,
-    )
-
+    answer = await _transfer_tool.generate_form(user_id, extra_text=current_question)
     return {
         "answer": answer,
         "history": ["transfer_human", "topic_resolved"]

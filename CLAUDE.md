@@ -67,19 +67,19 @@ Secrets (API keys, tokens) use `_env` suffix fields that reference `.env` variab
 
 ### Plugin/Registry Pattern
 
-New providers/retrievers are added by:
+New providers/tools are added by:
 1. Creating a module in the appropriate directory
 2. Registering it in the `__init__.py` registry dict
 
 Registries:
-- **`retrievers/__init__.py`** — `REGISTRY` maps type strings (`chroma`, `api`, `web_search`) to retriever classes. All retrievers extend `BaseRetriever` (abc) with `setup()` and `async aretrieve()`.
+- **`tools/__init__.py`** — `REGISTRY` maps type strings (`chroma`, `api`, `web_search`) to tool/retriever classes. All retrievers extend `BaseRetriever(BaseTool)` (in `tools/base_retriever.py`) with `setup()`, `async aretrieve()`, and `as_langchain_tool()`. Non-retriever tools (e.g. `TransferHumanTool`) extend `BaseTool` (in `tools/base.py`) directly.
 - **`llms/__init__.py`** — `LLM_REGISTRY` maps provider strings to builder functions
 - **`embeddings/__init__.py`** — `REGISTRY` maps embedding provider strings to builder functions
 - **`storage/__init__.py`** — `STORAGE_REGISTRY` maps storage type strings to builder functions (audit log)
 
 ### Shared Constants (`core/constants.py`)
 
-- **`PHONE_REGEX`** / **`ADDRESS_REGEX`** — Compiled regex patterns loaded from `config.toml` `[user_profile.extraction]` with hardcoded fallbacks. Used by `graph/nodes.py` and `tools/__init__.py` for profile data extraction.
+- **`PHONE_REGEX`** / **`ADDRESS_REGEX`** — Compiled regex patterns loaded from `config.toml` `[user_profile.extraction]` with hardcoded fallbacks. Used by `tools/transfer_human.py` for profile data extraction.
 
 ### Audit Log (`storage/`)
 

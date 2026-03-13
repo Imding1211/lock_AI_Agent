@@ -1,8 +1,8 @@
 import os
 from langchain_chroma import Chroma
-from .base import BaseRetriever
+from .base_retriever import BaseRetriever
 
-from embeddings import get_embedding 
+from embeddings import get_embedding
 
 class ChromaRetriever(BaseRetriever):
     def setup(self):
@@ -10,11 +10,11 @@ class ChromaRetriever(BaseRetriever):
         self.top_k = self.config.get("top_k", 2)
 
         embed_fn = get_embedding(self.config)
-        
+
         print(f"[*] 初始化 Async ChromaDB: 連線至資料庫路徑 {db_path}...")
-            
+
         self.vector_store = Chroma(
-            persist_directory=db_path, 
+            persist_directory=db_path,
             embedding_function=embed_fn
         )
 
