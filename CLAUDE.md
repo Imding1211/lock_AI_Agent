@@ -39,7 +39,7 @@ START → pre_process → manage_memory → router → {agents | out_of_domain |
 ```
 
 - **`state.py`** — `GraphState` TypedDict with `history` and `chat_history` as append-only (`Annotated[list, operator.add]`) fields
-- **`nodes.py`** — All LangGraph node functions: `pre_process`, `manage_memory`, `router`, `handle_out_of_domain`, `handle_transfer_human`, `merge_answers`, `update_profile`, `post_process`
+- **`nodes.py`** — All LangGraph node functions: `pre_process`, `manage_memory`, `router`, `merge_answers`, `update_profile`, `post_process`
 - **`builder.py`** — Wires nodes and conditional edges; dynamically creates agent subgraphs from `config.toml` `[[agents]]` entries
 
 ### Multi-Agent Architecture
