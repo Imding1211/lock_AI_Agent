@@ -3,7 +3,7 @@ from langgraph.types import Send
 from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from graph.state import GraphState
 from graph.nodes import (
-    pre_process, manage_memory, router, handle_out_of_domain,
+    pre_process, manage_memory, router,
     merge_answers, update_profile, post_process,
     llm as base_llm
 )
@@ -35,13 +35,11 @@ async def build_graph():
         clean = {**state, "history": [], "messages": agent_msgs}
 
         if not agents:
-            return [Send("out_of_domain", clean)]
-        if agents == ["out_of_domain"]:
-            return [Send("out_of_domain", clean)]
+            return [Send("merge_answers", clean)]
         # 過濾出有效的 agent，無效的跳過
         valid = [a for a in agents if a in agent_subgraphs]
         if not valid:
-            return [Send("out_of_domain", clean)]
+            return [Send("merge_answers", clean)]
 
         return [Send(a, clean) for a in valid]
 
@@ -52,7 +50,6 @@ async def build_graph():
     workflow.add_node("pre_process", pre_process)
     workflow.add_node("manage_memory", manage_memory)
     workflow.add_node("router", router)
-    workflow.add_node("out_of_domain", handle_out_of_domain)
     workflow.add_node("merge_answers", merge_answers)
     workflow.add_node("update_profile", update_profile)
     workflow.add_node("post_process", post_process)
@@ -65,15 +62,13 @@ async def build_graph():
     workflow.add_edge("pre_process", "manage_memory")
     workflow.add_edge("manage_memory", "router")
 
-    # router → 各 agent / out_of_domain（透過 Send() fan-out）
+    # router → 各 agent / merge_answers（透過 Send() fan-out）
     workflow.add_conditional_edges("router", route_by_intent)
 
     # 各 agent → merge_answers
     for name in agent_subgraphs:
         workflow.add_edge(name, "merge_answers")
 
-    # out_of_domain → merge_answers
-    workflow.add_edge("out_of_domain", "merge_answers")
     # merge_answers → update_profile → post_process → END
     workflow.add_edge("merge_answers", "update_profile")
     workflow.add_edge("update_profile", "post_process")

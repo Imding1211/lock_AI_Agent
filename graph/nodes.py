@@ -193,6 +193,18 @@ async def router(state: GraphState, config: RunnableConfig):
             "history": ["router:transfer_human", "topic_resolved"],
         }
 
+    # out_of_domain：由 router 直接產生禮貌拒絕
+    if targets == ["out_of_domain"]:
+        print("  [router] 直接處理 out_of_domain...")
+        domain = SYSTEM_CONFIG.get("domain", "電子鎖")
+        prompt = f"你是「{domain}」專屬客服。使用者問了與服務範圍無關的問題：「{question}」。請用繁體中文禮貌拒絕並引導詢問{domain}相關問題。語氣親切簡潔。"
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        return {
+            "answer": response.content.strip(),
+            "next_agents": [],
+            "history": ["router:out_of_domain"],
+        }
+
     print(f"  [router] 派發目標: {targets}")
 
     return {
@@ -200,23 +212,6 @@ async def router(state: GraphState, config: RunnableConfig):
         "history": [f"router:{'+'.join(targets)}"]
     }
 
-
-async def handle_out_of_domain(state: GraphState):
-    """非 Agent 回答的通用處理（out_of_domain 或 router 直接產生的 answer）"""
-    existing_answer = state.get("answer", "")
-    if existing_answer:
-        print("  [out_of_domain] answer 已由 router 產生，直接通過")
-        return {"answer": existing_answer, "history": ["direct_answer"]}
-
-    print("  [out_of_domain] 用 LLM 生成禮貌拒絕...")
-    domain = SYSTEM_CONFIG.get("domain", "電子鎖")
-    question = state.get("question", "")
-    prompt = f"你是「{domain}」專屬客服。使用者問了與服務範圍無關的問題：「{question}」。請用繁體中文禮貌拒絕並引導詢問{domain}相關問題。語氣親切簡潔。"
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return {
-        "answer": response.content.strip(),
-        "history": ["out_of_domain"]
-    }
 
 
 

@@ -15,11 +15,10 @@ graph TD
     subgraph supervisor_graph ["Supervisor Graph（LangGraph + SQLite Checkpointer）"]
         pre_process["pre_process<br/><small>載入 user profile<br/>注入 [前情提要] 摘要<br/>組裝 messages</small>"]
         manage_memory["manage_memory<br/><small>語意摘要壓縮<br/>messages > 閾值時觸發<br/>LLM 壓縮舊訊息</small>"]
-        router["router<br/><small>LLM 意圖分類<br/>支援多意圖<br/>→ next_agents</small>"]
+        router["router<br/><small>LLM 意圖分類<br/>直產轉接表單/拒絕語<br/>→ next_agents</small>"]
         merge_answers["merge_answers<br/><small>提取 answer<br/>多 agent 時 LLM 合併<br/>話題偵測</small>"]
         update_profile["update_profile<br/><small>LLM 萃取個資<br/>更新 user profile</small>"]
         post_process["post_process<br/><small>Markdown 清洗<br/>記錄 chat_history<br/>回傳最終 answer</small>"]
-        out_of_domain["out_of_domain<br/><small>LLM 禮貌拒絕<br/>非業務問題</small>"]
     end
 
     subgraph agents_layer ["Agent 子圖（Send fan-out 平行派發）"]
@@ -109,8 +108,7 @@ graph TD
     router -->|"troubleshooting"| troubleshooter_sub
     router -->|"order_status"| order_clerk_sub
     router -->|"web_search"| web_researcher_sub
-    router -->|"out_of_domain"| out_of_domain
-    router -->|"transfer_human<br/><small>Router 直接產生表單</small>"| out_of_domain
+    router -->|"out_of_domain / transfer_human<br/><small>Router 直接產生 answer</small>"| merge_answers
 
     %% Agent → merge_answers
     product_expert_sub --> merge_answers
@@ -119,7 +117,6 @@ graph TD
     web_researcher_sub --> merge_answers
 
     %% Terminal edges
-    out_of_domain --> merge_answers
     merge_answers --> update_profile
     update_profile --> post_process
     post_process -->|"answer"| langgraph_reply
@@ -135,6 +132,9 @@ graph TD
     prompt_wr --- WR_LLM
     prompt_merge --- merge_answers
     prompt_profile --- update_profile
+
+    %% Tool → router (transfer_human 由 router 直接呼叫)
+    tool_transfer --- router
 
     %% Tool → tool_node connections
     tool_manual --- PE_TOOL
@@ -191,7 +191,6 @@ graph TD
     class webhook,buffer debounce
     class pre_process,manage_memory,merge_answers,update_profile,post_process process
     class router router_style
-    class out_of_domain special
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
