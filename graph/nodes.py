@@ -181,6 +181,18 @@ async def router(state: GraphState, config: RunnableConfig):
     if "out_of_domain" in targets or "human" in targets:
         targets = [targets[0]]
 
+    # transfer_human：由 router 直接產生轉接表單
+    if targets == ["human"]:
+        print("  [router] 直接處理 transfer_human...")
+        cfg = config.get("configurable", {})
+        user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
+        answer = await _transfer_tool.generate_form(user_id, extra_text=question)
+        return {
+            "answer": answer,
+            "next_agents": [],
+            "history": ["router:transfer_human", "topic_resolved"],
+        }
+
     print(f"  [router] 派發目標: {targets}")
 
     return {
@@ -190,7 +202,12 @@ async def router(state: GraphState, config: RunnableConfig):
 
 
 async def handle_out_of_domain(state: GraphState):
-    """用 LLM 禮貌拒絕非業務問題"""
+    """非 Agent 回答的通用處理（out_of_domain 或 router 直接產生的 answer）"""
+    existing_answer = state.get("answer", "")
+    if existing_answer:
+        print("  [out_of_domain] answer 已由 router 產生，直接通過")
+        return {"answer": existing_answer, "history": ["direct_answer"]}
+
     print("  [out_of_domain] 用 LLM 生成禮貌拒絕...")
     domain = SYSTEM_CONFIG.get("domain", "電子鎖")
     question = state.get("question", "")
@@ -201,18 +218,6 @@ async def handle_out_of_domain(state: GraphState):
         "history": ["out_of_domain"]
     }
 
-
-async def handle_transfer_human(state: GraphState, config: RunnableConfig):
-    """轉接真人客服"""
-    print("  [transfer_human] 正在準備轉接...")
-    cfg = config.get("configurable", {})
-    user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
-    current_question = state.get("question", "")
-    answer = await _transfer_tool.generate_form(user_id, extra_text=current_question)
-    return {
-        "answer": answer,
-        "history": ["transfer_human", "topic_resolved"]
-    }
 
 
 async def merge_answers(state: GraphState):

@@ -4,7 +4,7 @@ from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from graph.state import GraphState
 from graph.nodes import (
     pre_process, manage_memory, router, handle_out_of_domain,
-    handle_transfer_human, merge_answers, update_profile, post_process,
+    merge_answers, update_profile, post_process,
     llm as base_llm
 )
 from memory import get_checkpointer
@@ -38,9 +38,6 @@ async def build_graph():
             return [Send("out_of_domain", clean)]
         if agents == ["out_of_domain"]:
             return [Send("out_of_domain", clean)]
-        if agents == ["human"]:
-            return [Send("human", clean)]
-
         # 過濾出有效的 agent，無效的跳過
         valid = [a for a in agents if a in agent_subgraphs]
         if not valid:
@@ -56,7 +53,6 @@ async def build_graph():
     workflow.add_node("manage_memory", manage_memory)
     workflow.add_node("router", router)
     workflow.add_node("out_of_domain", handle_out_of_domain)
-    workflow.add_node("human", handle_transfer_human)
     workflow.add_node("merge_answers", merge_answers)
     workflow.add_node("update_profile", update_profile)
     workflow.add_node("post_process", post_process)
@@ -69,7 +65,7 @@ async def build_graph():
     workflow.add_edge("pre_process", "manage_memory")
     workflow.add_edge("manage_memory", "router")
 
-    # router → 各 agent / out_of_domain / human（透過 Send() fan-out）
+    # router → 各 agent / out_of_domain（透過 Send() fan-out）
     workflow.add_conditional_edges("router", route_by_intent)
 
     # 各 agent → merge_answers
@@ -78,8 +74,6 @@ async def build_graph():
 
     # out_of_domain → merge_answers
     workflow.add_edge("out_of_domain", "merge_answers")
-    # human → merge_answers
-    workflow.add_edge("human", "merge_answers")
     # merge_answers → update_profile → post_process → END
     workflow.add_edge("merge_answers", "update_profile")
     workflow.add_edge("update_profile", "post_process")

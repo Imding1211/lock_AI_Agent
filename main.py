@@ -85,9 +85,20 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 
     final = await app.ainvoke(inputs, config=config)
 
-    current_history = final["history"][prev_len:]
-    print(f"[回覆] {final['answer']}")
-    print(f"[路徑]\n{format_history_tree(current_history)}")
+    # 給予 SQLite 寫入事務足夠的完成時間，避免讀寫競爭
+    await asyncio.sleep(0.5)
+
+    raw_history = final.get("history", [])
+    current_history = raw_history[prev_len:]
+    
+    print(f"[回覆] {final.get('answer', '(無回覆)')}")
+    
+    try:
+        path_tree = format_history_tree(current_history)
+        print(f"[路徑]\n{path_tree}")
+    except Exception as e:
+        print(f"[路徑] (路徑解析失敗: {e})")
+        print(f"原始數據: {current_history}")
 
     if show_memory:
         state = await app.aget_state(config)
@@ -108,7 +119,7 @@ if __name__ == "__main__":
 
         # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
-        """
+        
         # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
         await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
 
@@ -148,7 +159,11 @@ if __name__ == "__main__":
             print(f"[最終] thread={T}, messages={len(msgs)}, summary={len(summary)}字")
             if summary:
                 print(f"[摘要] {summary}")
-        """
-        await close_checkpointer()
+        
+        await asyncio.sleep(0.5)
+        try:
+            await asyncio.wait_for(close_checkpointer(), timeout=10)
+        except asyncio.TimeoutError:
+            print("[警告] close_checkpointer 超時，強制結束")
         
     asyncio.run(main())

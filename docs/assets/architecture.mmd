@@ -20,7 +20,6 @@ graph TD
         update_profile["update_profile<br/><small>LLM 萃取個資<br/>更新 user profile</small>"]
         post_process["post_process<br/><small>Markdown 清洗<br/>記錄 chat_history<br/>回傳最終 answer</small>"]
         out_of_domain["out_of_domain<br/><small>LLM 禮貌拒絕<br/>非業務問題</small>"]
-        human["transfer_human<br/><small>轉接真人客服<br/>帶入已知個資</small>"]
     end
 
     subgraph agents_layer ["Agent 子圖（Send fan-out 平行派發）"]
@@ -111,7 +110,7 @@ graph TD
     router -->|"order_status"| order_clerk_sub
     router -->|"web_search"| web_researcher_sub
     router -->|"out_of_domain"| out_of_domain
-    router -->|"transfer_human<br/><small>僅使用者明確堅持</small>"| human
+    router -->|"transfer_human<br/><small>Router 直接產生表單</small>"| out_of_domain
 
     %% Agent → merge_answers
     product_expert_sub --> merge_answers
@@ -121,14 +120,13 @@ graph TD
 
     %% Terminal edges
     out_of_domain --> merge_answers
-    human --> merge_answers
     merge_answers --> update_profile
     update_profile --> post_process
     post_process -->|"answer"| langgraph_reply
     langgraph_reply -->|"Reply / Push API"| LINE_USER
 
     %% Prompt → node connections
-    prompt_transfer --- human
+    prompt_transfer --- router
     prompt_summarize --- manage_memory
     prompt_router --- router
     prompt_pe --- PE_LLM
@@ -193,7 +191,7 @@ graph TD
     class webhook,buffer debounce
     class pre_process,manage_memory,merge_answers,update_profile,post_process process
     class router router_style
-    class out_of_domain,human special
+    class out_of_domain special
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
