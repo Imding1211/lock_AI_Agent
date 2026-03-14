@@ -142,6 +142,21 @@ async def router(state: GraphState, config: RunnableConfig):
     # 取得使用者問題（從 messages 中找最後一個 HumanMessage）
     question = state.get("question", "")
 
+    # Guardrail：敏感交易詞彙強制轉接真人
+    sensitive_keywords = SYSTEM_CONFIG.get("sensitive_keywords", [])
+    if sensitive_keywords:
+        for kw in sensitive_keywords:
+            if kw in question:
+                print(f"  [Guardrail] 偵測到敏感詞彙「{kw}」，強制轉接真人")
+                cfg = config.get("configurable", {})
+                user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
+                answer = await _transfer_tool.generate_form(user_id, extra_text=question)
+                return {
+                    "answer": answer,
+                    "next_agents": [],
+                    "history": ["guardrail_triggered", "topic_resolved"],
+                }
+
     response = await llm.ainvoke([
         SystemMessage(content=router_prompt),
         HumanMessage(content=question),

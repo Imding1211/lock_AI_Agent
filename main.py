@@ -44,7 +44,7 @@ def format_history_tree(history):
         elif item.startswith("manage_memory:"):
             blocks.append(("memory", item.split(":", 1)[1], None))
             i += 1
-        elif item == "topic_resolved":
+        elif item in ("topic_resolved", "guardrail_triggered"):
             blocks.append(("flag", item, None))
             i += 1
         else:
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     async def main():
         app = await build_graph()
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
-
+        """
         # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
         
@@ -142,6 +142,12 @@ if __name__ == "__main__":
         await run_test(app,
             "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
             thread_id="demo_human"
+        )
+        """
+        # --- 敏感詞護欄 → guardrail_triggered（跳過 LLM，強制轉接真人）---
+        await run_test(app,
+            "這款電子鎖多少錢？可以報價嗎？",
+            thread_id="demo_guardrail"
         )
 
 

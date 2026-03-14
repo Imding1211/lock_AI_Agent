@@ -31,6 +31,7 @@
 domain          = "電子鎖、智慧門鎖相關的產品、安裝、故障排除與售後服務"
 thread_prefix   = "smart_lock_"    # LangGraph thread ID 前綴
 request_timeout = 60               # LangGraph 執行超時秒數
+sensitive_keywords = ["報價", "價格", "多少錢", "費用", "金流", "退款", "匯款", "轉帳", "支付"]
 
 
 # ==========================================
