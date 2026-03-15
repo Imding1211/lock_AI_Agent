@@ -219,9 +219,9 @@ require_slots = false
 #    manage_memory 節點負責語意摘要壓縮
 # ==========================================
 [memory]
-type                   = "sqlite"            # "memory"（暫存）| "sqlite"（本地持久化）| "postgres"（資料庫）
-sqlite_path            = "./data/db/chat_history.db"  # sqlite 專用，資料庫檔案路徑
-# postgres_uri_env     = "POSTGRES_URI"              # PostgreSQL 連線字串（未來擴充）
+type                   = "postgres"           # "memory"（暫存）| "sqlite"（本地持久化）| "postgres"（資料庫）
+postgres_uri_env       = "POSTGRES_URI"       # PostgreSQL 連線字串
+# sqlite_path          = "./data/db/chat_history.db"  # sqlite 專用，回退時取消註解
 max_messages_threshold = 10                   # messages 超過此數量時觸發語意摘要壓縮
 context_retention_pair = 2                    # 壓縮後保留最近幾對對話（1 對 = 1 human + 1 ai）
 
@@ -253,9 +253,10 @@ address_regex = '[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[
 #     持久化原始對話紀錄（user + AI）
 # ==========================================
 [storage]
-type        = "sqlite"
-sqlite_path = "./data/db/audit_log.db"
-# postgres_uri_env = "POSTGRES_URI"
+type             = "postgres"
+postgres_uri_env = "POSTGRES_URI"
+# type           = "sqlite"                           # 回退時取消註解
+# sqlite_path    = "./data/db/audit_log.db"
 
 
 # ==========================================

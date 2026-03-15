@@ -12,7 +12,7 @@ graph TD
         buffer --> langgraph_reply
     end
 
-    subgraph supervisor_graph ["Supervisor Graph（LangGraph + SQLite Checkpointer）"]
+    subgraph supervisor_graph ["Supervisor Graph（LangGraph + PostgreSQL Checkpointer）"]
         pre_process["pre_process<br/><small>載入 user profile<br/>注入 [前情提要] 摘要<br/>組裝 messages</small>"]
         manage_memory["manage_memory<br/><small>語意摘要壓縮<br/>messages > 閾值時觸發<br/>LLM 壓縮舊訊息</small>"]
         router["router<br/><small>敏感詞攔截 → 強制轉接<br/>LLM 意圖分類<br/>直產轉接表單/拒絕語<br/>→ next_agents</small>"]
@@ -88,8 +88,8 @@ graph TD
     subgraph persistence ["持久化儲存"]
         direction LR
         profile_store[("User Profiles<br/><small>./data/profiles/*.md</small>")]
-        sqlite_store[("SQLite<br/><small>./data/db/chat_history.db<br/>Checkpointer + 對話記憶</small>")]
-        audit_store[("SQLite<br/><small>./data/db/audit_log.db<br/>審計日誌</small>")]
+        pg_checkpointer[("PostgreSQL<br/><small>Checkpointer + 對話記憶</small>")]
+        pg_audit[("PostgreSQL<br/><small>audit_log 表<br/>審計日誌</small>")]
     end
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
@@ -155,9 +155,9 @@ graph TD
     %% Persistence connections
     pre_process -.->|"載入"| profile_store
     update_profile -.->|"儲存"| profile_store
-    manage_memory -.->|"讀寫摘要"| sqlite_store
-    webhook -.->|"user_raw"| audit_store
-    langgraph_reply -.->|"user + ai"| audit_store
+    manage_memory -.->|"讀寫摘要"| pg_checkpointer
+    webhook -.->|"user_raw"| pg_audit
+    langgraph_reply -.->|"user + ai"| pg_audit
 
     %% Embedding connections (Per-DB，各資料庫獨立設定)
     EMBEDDING_ENGINE -..- pgvec_manual
@@ -194,7 +194,7 @@ graph TD
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class pgvec_manual,pgvec_trouble,order_api,duckduckgo datastore
-    class profile_store,sqlite_store,audit_store persist
+    class profile_store,pg_checkpointer,pg_audit persist
     class LLM_ENGINE,EMBEDDING_ENGINE llm_style
     class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
     class langgraph_reply debounce

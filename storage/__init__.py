@@ -1,5 +1,5 @@
-from .sqlite_impl import build_sqlite_storage, close_sqlite_storage
-from .postgres_impl import build_postgres_storage
+from .sqlite_impl import build_sqlite_storage, close_sqlite_storage, SqliteAuditStorage
+from .postgres_impl import build_postgres_storage, close_postgres_storage, PostgresAuditStorage
 
 STORAGE_REGISTRY = {
     "sqlite": build_sqlite_storage,
@@ -24,5 +24,8 @@ async def get_storage(config: dict):
 async def close_storage():
     global _storage_instance
     if _storage_instance is not None:
-        await close_sqlite_storage()
+        if isinstance(_storage_instance, PostgresAuditStorage):
+            await close_postgres_storage()
+        else:
+            await close_sqlite_storage()
         _storage_instance = None

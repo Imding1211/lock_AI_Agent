@@ -11,6 +11,7 @@ python-dotenv
 line-bot-sdk
 langgraph
 langgraph-checkpoint-sqlite
+langgraph-checkpoint-postgres
 requests
 fastapi
 uvicorn

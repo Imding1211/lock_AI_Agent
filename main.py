@@ -8,27 +8,47 @@ import asyncio
 logging.getLogger("curl_cffi").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", message="Your application has authenticated using end user credentials")
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from graph.builder import build_graph
 from memory import close_checkpointer
 
 
-def clean_test_data():
+async def clean_test_data():
     """清除測試資料，確保每次測試從乾淨狀態開始。"""
-    removed = []
+    cleaned = []
 
-    # 清除對話記憶 DB
+    # 清除 PostgreSQL 資料（若有連線）
+    pg_uri = os.getenv("POSTGRES_URI")
+    if pg_uri:
+        try:
+            from psycopg import AsyncConnection
+            conn = await AsyncConnection.connect(pg_uri)
+            # 清除 checkpointer 表（langgraph-checkpoint-postgres 建立的表）
+            for table in ("checkpoints", "checkpoint_writes", "checkpoint_blobs", "checkpoint_migrations"):
+                await conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
+            # 清除審計日誌表
+            await conn.execute("DROP TABLE IF EXISTS audit_log CASCADE")
+            await conn.commit()
+            await conn.close()
+            cleaned.append("PostgreSQL tables")
+        except Exception as e:
+            print(f"[清除] PostgreSQL 清除失敗: {e}")
+
+    # 清除 SQLite 檔案（回退模式）
     for db in ("data/db/chat_history.db", "data/db/audit_log.db"):
         if os.path.exists(db):
             os.remove(db)
-            removed.append(db)
+            cleaned.append(db)
 
     # 清除使用者輪廓
     for f in glob.glob("data/profiles/*.md"):
         os.remove(f)
-        removed.append(f)
+        cleaned.append(f)
 
-    if removed:
-        print(f"[清除] 已刪除 {len(removed)} 個檔案: {', '.join(removed)}")
+    if cleaned:
+        print(f"[清除] 已清除: {', '.join(cleaned)}")
     else:
         print("[清除] 無需清除，已是乾淨狀態")
 
@@ -110,7 +130,7 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 
     final = await app.ainvoke(inputs, config=config)
 
-    # 給予 SQLite 寫入事務足夠的完成時間，避免讀寫競爭
+    # 給予資料庫寫入事務足夠的完成時間，避免讀寫競爭
     await asyncio.sleep(0.5)
 
     raw_history = final.get("history", [])
@@ -142,13 +162,13 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 
 if __name__ == "__main__":
     async def main():
-        clean_test_data()
+        await clean_test_data()
         app = await build_graph()
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
         
         # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
-        """
+        
         # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
         await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
 
@@ -178,14 +198,11 @@ if __name__ == "__main__":
             "這款電子鎖多少錢？可以報價嗎？",
             thread_id="demo_guardrail"
         )
-        """
+        
 
 
-        # --- SQLite 持久化驗證 ---
+        # --- 持久化驗證 ---
         print("=" * 40)
-        db_path = "./data/db/chat_history.db"
-        if os.path.exists(db_path):
-            print(f"[SQLite] {db_path} = {os.path.getsize(db_path):,} bytes")
 
         config = {"configurable": {"thread_id": T, "user_id": T}}
         try:
