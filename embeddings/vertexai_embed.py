@@ -16,11 +16,12 @@ def build_vertexai_embedding(config: dict):
     if not location:
         raise ValueError(f"缺少 GCP 區域！請在 .env 檔案中設定 {location_env}")
 
+    dimensions = config.get("embedding_dimensions")
+
     print(f"[*] 初始化 Embedding: 載入 Vertex AI (模型: {model_name})")
 
-    return GoogleGenerativeAIEmbeddings(
-        model=model_name,
-        project=project_id,
-        location=location,
-        vertexai=True,
-    )
+    kwargs = dict(model=model_name, project=project_id, location=location, vertexai=True)
+    if dimensions:
+        kwargs["model_kwargs"] = {"output_dimensionality": int(dimensions)}
+
+    return GoogleGenerativeAIEmbeddings(**kwargs)

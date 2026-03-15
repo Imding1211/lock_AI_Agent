@@ -148,7 +148,7 @@ if __name__ == "__main__":
         
         # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
-        
+        """
         # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
         await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
 
@@ -178,6 +178,7 @@ if __name__ == "__main__":
             "這款電子鎖多少錢？可以報價嗎？",
             thread_id="demo_guardrail"
         )
+        """
 
 
         # --- SQLite 持久化驗證 ---
