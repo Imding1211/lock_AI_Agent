@@ -277,17 +277,18 @@ require_slots = false                # 是否需要先完成槽位填充
 
 ```toml
 [memory]
-type = "sqlite"                    # 可選: "memory" (暫存), "sqlite" (本地持久化), "postgres" (資料庫持久化)
-sqlite_path = "./data/db/chat_history.db"  # sqlite 專用，資料庫檔案路徑
-# postgres_uri_env = "POSTGRES_URI"        # PostgreSQL 連線字串（未來擴充）
-max_messages_threshold = 10        # messages 超過此數量時觸發語意摘要壓縮
-context_retention_pair = 2         # 壓縮後保留最近幾對 (human+ai) 訊息
+type                   = "postgres"           # 可選: "memory" (暫存), "sqlite" (本地持久化), "postgres" (資料庫持久化，預設)
+postgres_uri_env       = "POSTGRES_URI"       # PostgreSQL 連線字串環境變數
+# sqlite_path          = "./data/db/chat_history.db"  # sqlite 回退時取消註解
+max_messages_threshold = 10                   # messages 超過此數量時觸發語意摘要壓縮
+context_retention_pair = 2                    # 壓縮後保留最近幾對 (human+ai) 訊息
 ```
 
 | 參數 | 說明 |
 |------|------|
-| `type` | Checkpointer 類型。`"memory"` 僅存於記憶體（重啟即失）；`"sqlite"` 持久化至本地檔案；`"postgres"` 持久化至 PostgreSQL |
-| `sqlite_path` | `sqlite` 類型專用，指定 `.db` 檔案路徑 |
+| `type` | Checkpointer 類型。`"postgres"` 持久化至 PostgreSQL（預設）；`"sqlite"` 持久化至本地檔案（回退方案）；`"memory"` 僅存於記憶體（重啟即失） |
+| `postgres_uri_env` | `postgres` 類型專用，指向 `.env` 中的 PostgreSQL 連線字串變數名 |
+| `sqlite_path` | `sqlite` 類型專用，指定 `.db` 檔案路徑（回退時使用） |
 | `max_messages_threshold` | `manage_memory` 節點的觸發門檻。當 `messages` 數量超過此值，LLM 會將舊訊息壓縮為結構化摘要 |
 | `context_retention_pair` | 壓縮後保留的最近對話對數（1 對 = 1 human + 1 ai = 2 條 message） |
 
@@ -314,12 +315,15 @@ device_brand = "使用者的電子鎖品牌。"
 
 ## 11. 使用者輪廓記憶設定 `[user_profile]`
 
-管理動態使用者輪廓（User Profile），系統會在 `update_profile` 節點透過 LLM 從對話中萃取個人資訊（設備型號、地址、電話等），持久化至檔案系統。
+管理動態使用者輪廓（User Profile）。系統採用「雙軌設計」：**硬事實**（電話、地址、設備型號/品牌）儲存於 PostgreSQL `user_facts` 表，以 SCD Type 2 版本控制；**軟資訊**（偏好、過去問題、個性等）則持久化至 `.md` 檔案，由 LLM 萃取管理。
 
 ```toml
 [user_profile]
-enabled = true                     # 是否啟用輪廓功能
-profile_dir = "./data/profiles"    # 輪廓檔案儲存目錄
+enabled                = true                  # 是否啟用輪廓功能
+profile_dir            = "./data/profiles"     # 軟資訊 Markdown 檔案儲存目錄
+facts_enabled          = true                  # 是否啟用硬事實 SQL 儲存
+facts_postgres_uri_env = "POSTGRES_URI"        # 硬事實 PostgreSQL 連線字串環境變數
+fact_attributes        = ["phone", "address", "device_model", "device_brand"]  # 硬事實欄位清單
 
 [user_profile.extraction]
 phone_regex   = '09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}'
@@ -329,11 +333,14 @@ address_regex = '[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[
 | 參數 | 說明 |
 |------|------|
 | `enabled` | 是否啟用使用者輪廓功能 |
-| `profile_dir` | 輪廓 Markdown 檔案的儲存目錄，每位使用者一個 `{user_id}.md` 檔 |
+| `profile_dir` | 軟資訊 Markdown 檔案的儲存目錄，每位使用者一個 `{user_id}.md` 檔 |
+| `facts_enabled` | 是否啟用硬事實 SQL 儲存（需要 PostgreSQL） |
+| `facts_postgres_uri_env` | 硬事實 PostgreSQL 連線字串的環境變數名 |
+| `fact_attributes` | 硬事實欄位清單，對應 `user_facts` 表的 `attr_key`。採用 key-value 結構，新增欄位只需加入此陣列 |
 | `phone_regex` | 電話號碼正則表達式（TOML 單引號 literal string，不轉義反斜線） |
 | `address_regex` | 地址正則表達式（用於 `transfer_to_human` 個資提取） |
 
-> **輪廓用途**：`pre_process` 載入輪廓注入對話；`update_profile` 在每輪結束後更新；`transfer_human` 從輪廓提取個資帶入轉接表單。
+> **雙軌輪廓設計**：`pre_process` 透過 `load_full_profile()` 組合 SQL facts（帶 `[Verified Fact]` 標記）+ `.md` 軟資訊，注入 Agent prompt 的 `{user_profile}` 變數。`update_profile` 節點透過 LLM 產生 JSON 結構化輸出（`hard_facts` → SQL、`soft_profile` → `.md`），硬事實寫入 PostgreSQL，軟資訊更新 Markdown 檔案。`transfer_to_human` 優先使用 SQL facts，無值才 fallback regex 提取。
 >
 > **Extraction 子表**：`[user_profile.extraction]` 定義 `transfer_to_human` 節點與工具從對話中提取個資的 regex。支援國際化——修改 regex 即可適應不同國家的電話/地址格式，無需改動 Python 程式碼。`core/constants.py` 會從此處動態載入，若未設定則使用台灣格式作為 fallback。
 
@@ -345,16 +352,17 @@ address_regex = '[\u4e00-\u9fff]*(?:市|縣)[\u4e00-\u9fff]*(?:區|鄉|鎮|市)[
 
 ```toml
 [storage]
-type        = "sqlite"
-sqlite_path = "./data/db/audit_log.db"
-# postgres_uri_env = "POSTGRES_URI"
+type             = "postgres"                  # 可選: "postgres" (資料庫持久化，預設), "sqlite" (本地持久化)
+postgres_uri_env = "POSTGRES_URI"              # PostgreSQL 連線字串環境變數
+# type           = "sqlite"                    # 回退時取消註解
+# sqlite_path    = "./data/db/audit_log.db"
 ```
 
 | 參數 | 說明 |
 |------|------|
-| `type` | 儲存類型。`"sqlite"` 持久化至本地檔案；`"postgres"` 持久化至 PostgreSQL（預留） |
-| `sqlite_path` | `sqlite` 類型專用，指定 `.db` 檔案路徑 |
-| `postgres_uri_env` | PostgreSQL 連線字串的環境變數名（未來擴充） |
+| `type` | 儲存類型。`"postgres"` 持久化至 PostgreSQL（預設）；`"sqlite"` 持久化至本地檔案（回退方案） |
+| `postgres_uri_env` | `postgres` 類型專用，指向 `.env` 中的 PostgreSQL 連線字串變數名 |
+| `sqlite_path` | `sqlite` 類型專用，指定 `.db` 檔案路徑（回退時使用） |
 
 > **角色區分**：`user_raw` 為 webhook 收到的原始碎裂訊息（debounce 之前）；`user` 為合併後送入 LangGraph 的訊息；`ai` 為 AI 回覆。
 
@@ -399,7 +407,7 @@ transfer_form   = "agents/prompts/transfer_human_form.md"
 | `[[intents]]` | `graph/nodes.py` Router → `Send()` fan-out 派發 |
 | `[memory]` | `memory/__init__.py` → Checkpointer + manage_memory 壓縮策略 |
 | `[required_slots]` | `graph/nodes.py` Router 槽位檢查 |
-| `[user_profile]` | `profiles/manager.py` → pre_process / update_profile |
+| `[user_profile]` | `profiles/manager.py` → pre_process / update_profile + PostgreSQL `user_facts` |
 | `[user_profile.extraction]` | `core/constants.py` → 電話/地址 regex 動態載入 |
 | `[storage]` | `storage/__init__.py` → 審計日誌持久化 |
 | `[prompts]` | `graph/nodes.py`、`tools/__init__.py` → prompt 路徑集中管理 |
