@@ -1,3 +1,4 @@
+import json
 import re
 from langchain_core.messages import HumanMessage, SystemMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
@@ -26,7 +27,7 @@ async def pre_process(state: GraphState, config: RunnableConfig):
     if USER_PROFILE_CONFIG.get("enabled", False):
         cfg = config.get("configurable", {})
         user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
-        user_profile = await profile_manager.load_profile(user_id)
+        user_profile = await profile_manager.load_full_profile(user_id)
         if user_profile:
             print(f"  [pre_process] 已載入 {user_id} 的輪廓 ({len(user_profile)} 字元)")
         else:
@@ -335,20 +336,47 @@ async def update_profile(state: GraphState, config: RunnableConfig):
         question = state.get("question", "")
         domain = SYSTEM_CONFIG.get("domain", "電子鎖")
 
+        fact_attrs = ", ".join(USER_PROFILE_CONFIG.get("fact_attributes", []))
         prompt = load_prompt_template(
             PROMPTS_CONFIG.get("profile_updater", "agents/prompts/update_profile.md"),
             domain=domain,
             existing_profile=existing_profile if existing_profile else "(empty - new user)",
             question=question,
             answer=answer,
+            fact_attributes=fact_attrs if fact_attrs else "phone, address, device_model, device_brand",
         )
 
         try:
             response = await llm.ainvoke(prompt)
-            updated = response.content.strip()
-            if updated and len(updated) >= 10:
-                await profile_manager.save_profile(user_id, updated)
-                print(f"  [update_profile] 已更新 {user_id} 的輪廓")
+            raw_text = response.content.strip()
+
+            # Strip code fence if LLM wraps output in ```json ... ```
+            cleaned = re.sub(r'^```(?:json)?\s*', '', raw_text)
+            cleaned = re.sub(r'\s*```$', '', cleaned)
+
+            try:
+                parsed = json.loads(cleaned)
+
+                # Write hard_facts to PostgreSQL via SCD Type 2
+                hard_facts = parsed.get("hard_facts", {})
+                if hard_facts and isinstance(hard_facts, dict):
+                    for key, val in hard_facts.items():
+                        if val is not None and str(val).strip():
+                            await profile_manager.update_fact(user_id, key, str(val).strip())
+                            print(f"  [update_profile] fact 寫入: {key}={val}")
+
+                # Write soft_profile to .md file
+                soft_profile = parsed.get("soft_profile")
+                if soft_profile and isinstance(soft_profile, str) and len(soft_profile.strip()) >= 10:
+                    await profile_manager.save_profile(user_id, soft_profile.strip())
+                    print(f"  [update_profile] 已更新 {user_id} 的軟輪廓")
+
+            except json.JSONDecodeError:
+                # Fallback: treat entire response as soft profile (backward compatible)
+                print("  [update_profile] JSON 解析失敗，fallback 為軟輪廓存檔")
+                if raw_text and len(raw_text) >= 10:
+                    await profile_manager.save_profile(user_id, raw_text)
+
         except Exception as e:
             print(f"  [update_profile] 更新輪廓失敗: {e}")
 

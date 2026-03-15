@@ -19,11 +19,12 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
-from core.config import LINE_BOT_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG, SYSTEM_CONFIG, STORAGE_CONFIG
+from core.config import LINE_BOT_CONFIG, TEMPLATES_CONFIG, DEBOUNCE_CONFIG, SYSTEM_CONFIG, STORAGE_CONFIG, USER_PROFILE_CONFIG
 
 from graph.builder import build_graph
 from storage import get_storage, close_storage
 from memory import close_checkpointer
+from profiles import init_facts_db, close_facts_db
 
 # 載入環境變數 (.env)
 load_dotenv()
@@ -178,11 +179,14 @@ async def cleanup_stale_buffers():
 async def startup_event():
     global langgraph_app, audit_storage
     audit_storage = await get_storage(STORAGE_CONFIG)
+    if USER_PROFILE_CONFIG.get("facts_enabled", False):
+        await init_facts_db(USER_PROFILE_CONFIG)
     langgraph_app = await build_graph()
     asyncio.create_task(cleanup_stale_buffers())
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    await close_facts_db()
     await close_storage()
     await close_checkpointer()
 

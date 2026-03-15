@@ -90,6 +90,7 @@ graph TD
         profile_store[("User Profiles<br/><small>./data/profiles/*.md</small>")]
         pg_checkpointer[("PostgreSQL<br/><small>Checkpointer + 對話記憶</small>")]
         pg_audit[("PostgreSQL<br/><small>audit_log 表<br/>審計日誌</small>")]
+        pg_facts[("PostgreSQL<br/><small>user_facts 表<br/>SCD Type 2</small>")]
     end
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
@@ -154,7 +155,9 @@ graph TD
 
     %% Persistence connections
     pre_process -.->|"載入"| profile_store
+    pre_process -.->|"載入事實"| pg_facts
     update_profile -.->|"儲存"| profile_store
+    update_profile -.->|"寫入事實"| pg_facts
     manage_memory -.->|"讀寫摘要"| pg_checkpointer
     webhook -.->|"user_raw"| pg_audit
     langgraph_reply -.->|"user + ai"| pg_audit
@@ -194,7 +197,7 @@ graph TD
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
     class pgvec_manual,pgvec_trouble,order_api,duckduckgo datastore
-    class profile_store,pg_checkpointer,pg_audit persist
+    class profile_store,pg_checkpointer,pg_audit,pg_facts persist
     class LLM_ENGINE,EMBEDDING_ENGINE llm_style
     class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
     class langgraph_reply debounce

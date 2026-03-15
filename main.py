@@ -13,6 +13,8 @@ load_dotenv()
 
 from graph.builder import build_graph
 from memory import close_checkpointer
+from core.config import USER_PROFILE_CONFIG
+from profiles import ProfileManager, init_facts_db, close_facts_db
 
 
 async def clean_test_data():
@@ -30,9 +32,11 @@ async def clean_test_data():
                 await conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
             # 清除審計日誌表
             await conn.execute("DROP TABLE IF EXISTS audit_log CASCADE")
+            # 清除 user_facts 資料（保留表結構）
+            await conn.execute("DELETE FROM user_facts")
             await conn.commit()
             await conn.close()
-            cleaned.append("PostgreSQL tables")
+            cleaned.append("PostgreSQL tables + user_facts data")
         except Exception as e:
             print(f"[清除] PostgreSQL 清除失敗: {e}")
 
@@ -51,6 +55,36 @@ async def clean_test_data():
         print(f"[清除] 已清除: {', '.join(cleaned)}")
     else:
         print("[清除] 無需清除，已是乾淨狀態")
+
+
+async def show_user_facts(user_id: str):
+    """查詢並顯示指定使用者的 user_facts。"""
+    pg_uri = os.getenv("POSTGRES_URI")
+    if not pg_uri:
+        print(f"[Facts] POSTGRES_URI 未設定，跳過")
+        return
+    try:
+        from psycopg import AsyncConnection
+        conn = await AsyncConnection.connect(pg_uri)
+        cursor = await conn.execute(
+            "SELECT attr_key, attr_val, is_current, start_date, end_date "
+            "FROM user_facts WHERE user_id = %s ORDER BY attr_key, start_date DESC",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        await conn.close()
+
+        if not rows:
+            print(f"[Facts] {user_id}: (無記錄)")
+            return
+
+        print(f"[Facts] {user_id}:")
+        for key, val, is_current, start, end in rows:
+            status = "CURRENT" if is_current else "EXPIRED"
+            end_str = str(end)[:19] if end else "—"
+            print(f"  {key:<15} = {val:<30} [{status}] {str(start)[:19]} ~ {end_str}")
+    except Exception as e:
+        print(f"[Facts] 查詢失敗: {e}")
 
 
 def _is_agent_step(item):
@@ -135,9 +169,9 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 
     raw_history = final.get("history", [])
     current_history = raw_history[prev_len:]
-    
+
     print(f"[回覆] {final.get('answer', '(無回覆)')}")
-    
+
     try:
         path_tree = format_history_tree(current_history)
         print(f"[路徑]\n{path_tree}")
@@ -163,12 +197,20 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 if __name__ == "__main__":
     async def main():
         await clean_test_data()
+
+        # 初始化 Facts DB
+        if USER_PROFILE_CONFIG.get("facts_enabled", False):
+            await init_facts_db(USER_PROFILE_CONFIG)
+
         app = await build_graph()
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
-        
-        # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
+
+        # --- 第 1 輪：產品問題（含個資）→ product_expert + facts 寫入 ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
-        
+
+        # 驗證 facts：應寫入 device_brand=Philips, device_model=Alpha
+        await show_user_facts(T)
+
         # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
         await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
 
@@ -187,18 +229,35 @@ if __name__ == "__main__":
             thread_id="demo_multi"
         )
 
-        # --- 轉接真人 → transfer_human（帶入輪廓資訊）---
+        # --- 轉接真人（含個資）→ transfer_human + facts 寫入 ---
         await run_test(app,
             "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
             thread_id="demo_human"
         )
-        
+
+        # 驗證 facts：應寫入 phone, address
+        await show_user_facts("demo_human")
+
         # --- 敏感詞護欄 → guardrail_triggered（跳過 LLM，強制轉接真人）---
         await run_test(app,
             "這款電子鎖多少錢？可以報價嗎？",
             thread_id="demo_guardrail"
         )
-        
+
+        # --- SCD Type 2 驗證：更新地址，確認舊記錄 EXPIRED ---
+        await run_test(app,
+            "我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓",
+            thread_id="demo_human"
+        )
+
+        # 驗證 SCD：舊地址 EXPIRED + 新地址 CURRENT
+        await show_user_facts("demo_human")
+
+        # --- 轉接真人（驗證 SQL facts 優先填入表單）---
+        await run_test(app,
+            "我要找真人客服，請幫我轉接真人",
+            thread_id="demo_human"
+        )
 
 
         # --- 持久化驗證 ---
@@ -215,11 +274,18 @@ if __name__ == "__main__":
                     print(f"[摘要] {summary}")
         except asyncio.TimeoutError:
             print("[警告] 最終 aget_state 超時，跳過")
-        
+
+        # 顯示所有測試使用者的 facts
+        print("\n" + "=" * 40)
+        print("[Facts 總覽]")
+        for uid in (T, "demo_human", "demo_ood", "demo_multi", "demo_guardrail"):
+            await show_user_facts(uid)
+
         await asyncio.sleep(0.5)
+        await close_facts_db()
         try:
             await asyncio.wait_for(close_checkpointer(), timeout=10)
         except asyncio.TimeoutError:
             print("[警告] close_checkpointer 超時，強制結束")
-        
+
     asyncio.run(main())

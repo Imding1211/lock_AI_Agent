@@ -23,20 +23,27 @@ class TransferHumanTool(BaseTool):
         """
         print(f"  [Tool 呼叫] transfer_to_human: user_id={user_id}")
 
-        user_profile = await self.profile_manager.load_profile(user_id)
+        # Priority 1: Load structured facts from PostgreSQL
+        facts = await self.profile_manager.load_facts(user_id)
+        phone = facts.get("phone", "")
+        address = facts.get("address", "")
+        device_model = facts.get("device_model", "")
+        device_brand = facts.get("device_brand", "")
+        brand_model = f"{device_brand} {device_model}".strip() if (device_brand or device_model) else ""
 
-        combined_text = f"{user_profile}\n{extra_text}" if extra_text else (user_profile or "")
-
-        phone = ""
-        address = ""
-        brand_model = ""
-        if combined_text:
-            phone_match = PHONE_REGEX.search(combined_text)
-            if phone_match:
-                phone = phone_match.group()
-            addr_match = ADDRESS_REGEX.search(combined_text)
-            if addr_match:
-                address = addr_match.group().strip()
+        # Priority 2: Fallback to regex extraction from profile + extra_text
+        if not phone or not address:
+            user_profile = await self.profile_manager.load_profile(user_id)
+            combined_text = f"{user_profile}\n{extra_text}" if extra_text else (user_profile or "")
+            if combined_text:
+                if not phone:
+                    phone_match = PHONE_REGEX.search(combined_text)
+                    if phone_match:
+                        phone = phone_match.group()
+                if not address:
+                    addr_match = ADDRESS_REGEX.search(combined_text)
+                    if addr_match:
+                        address = addr_match.group().strip()
 
         has_info = any([brand_model, phone, address])
         header = "您好\n麻煩您確認並補充以下資訊" if has_info else "您好\n麻煩您留下以下資訊"

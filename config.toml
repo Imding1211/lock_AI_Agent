@@ -240,8 +240,11 @@ device_brand = "使用者的電子鎖品牌。"
 #     跨對話持久化使用者個人資訊
 # ==========================================
 [user_profile]
-enabled     = true
-profile_dir = "./data/profiles"
+enabled                = true
+profile_dir            = "./data/profiles"
+facts_enabled          = true
+facts_postgres_uri_env = "POSTGRES_URI"
+fact_attributes        = ["phone", "address", "device_model", "device_brand"]
 
 [user_profile.extraction]
 phone_regex   = '09\d{2}[\-\s]?\d{3}[\-\s]?\d{3}'

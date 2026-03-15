@@ -1,5 +1,6 @@
 [*] 初始化 LLM: 載入 vertexai (模型: gemini-2.5-flash)
-[清除] 已清除: PostgreSQL tables, data/profiles/demo.md
+[清除] 已清除: PostgreSQL tables + user_facts data, data/profiles/demo.md, data/profiles/demo_human.md, data/profiles/demo_multi.md
+[Facts DB] 已連線至 PostgreSQL（user_facts）
 [*] 初始化 Embedding: 載入 Vertex AI (模型: text-embedding-004)
 [*] 初始化 PGVector: collection=smartlock_manual...
 [*] 維度驗證通過: 768
@@ -38,13 +39,22 @@
   [merge_answers] 正在提取並合併回覆...
   [merge_answers] 最終回覆: 您好！關於 Phil...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo 的輪廓
+  [update_profile] fact 寫入: device_model=Alpha
+  [update_profile] fact 寫入: device_brand=Philips
+  [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！關於 Philips Alpha 電子鎖的指紋設定步驟，目前資料庫中沒有詳細的操作說明。
+[回覆] 您好！關於 Philips Alpha 指紋電子鎖的指紋設定方式，目前資料庫中沒有找到詳細的操作步驟。
 
-不過，我可以提供您 Philips Alpha 的指紋容量資訊：它最多可以設定 100 組指紋。
+不過，我可以提供您 Philips Alpha 的產品規格：
 
-建議您可以參考產品隨附的使用手冊，裡面會有詳細的指紋設定教學。如果您手邊沒有手冊，或是需要進一步的協助，請告訴我，我可以嘗試提供一些通用的指紋設定步驟，或是建議您提供更多資訊，以便我能更精確地協助您。
+1.  品牌：Philips
+2.  型號：Alpha
+3.  解鎖方式：指紋（半導體感應）、密碼（6-12 位）、卡片（Mifare）、機械鑰匙、藍牙 App
+4.  指紋容量：最多 100 組
+
+通常指紋設定會需要進入門鎖的管理模式，然後依照語音提示或螢幕指示進行操作。
+
+如果您需要更詳細的設定步驟，建議您可以參考產品說明書，或是提供說明書上的相關章節，我可以再幫您查找看看。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -58,10 +68,13 @@
 └── post_process
 [記憶] messages=4, summary=0字
 
+[Facts] demo:
+  device_brand    = Philips                        [CURRENT] 2026-03-15 15:43:20 ~ —
+  device_model    = Alpha                          [CURRENT] 2026-03-15 15:43:09 ~ —
 
 >>> [demo] 指紋辨識不靈敏，按好幾次才能開門
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (41 字元)
+  [pre_process] 已載入 demo 的輪廓 (305 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 5 <= 閾值 10，跳過壓縮
   [router] 正在分類意圖...
@@ -77,21 +90,19 @@
   [merge_answers] 正在提取並合併回覆...
   [merge_answers] 最終回覆: 您好！了解到您的 P...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo 的輪廓
+  [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！了解到您的 Philips Alpha 電子鎖指紋辨識不靈敏，需要按好幾次才能開門，這確實會造成不便。
+[回覆] 您好！了解到您的 Philips Alpha 電子鎖指紋辨識不太靈敏，需要按好幾次才能開門，這確實會造成不便。
 
-根據您描述的狀況，您可以先嘗試以下幾個排查步驟：
+根據您描述的狀況，您可以先嘗試以下幾個排查步驟，看看是否能改善問題：
 
-1.  確認手指狀況：請檢查您的手指是否有汗水、油污，或是過於乾燥。這些都可能影響指紋辨識的靈敏度。
-2.  檢查指紋感應區：請仔細看看指紋感應區是否有明顯的刮痕或髒污，這可能會影響感應效果。
-3.  嘗試使用不同手指：有時候特定手指的指紋可能較難辨識，您可以試試看使用其他已錄入的指紋來開門。
-4.  重啟門鎖：您可以嘗試將門鎖內部的電池拔除，等待大約 10 秒後再重新裝入，讓門鎖重新啟動。
-5.  重新錄製指紋：如果上述方法都無效，建議您進入管理員選單，將目前不靈敏的指紋刪除後，再重新錄製一次。
+1.  請先確認您的手指是否乾淨，沒有汗水、油污，或是否過於乾燥。這些都可能影響指紋感應的準確性。
+2.  檢查一下指紋感應區，看看是否有明顯的刮痕或髒污，這也可能影響感應效果。
+3.  您可以試著使用不同的手指進行解鎖，看看是否只有特定手指有這個問題。
+4.  嘗試重新啟動您的電子鎖：請將門鎖內部的電池拔除，等待大約 10 秒後再重新裝入。
+5.  如果上述方法都無效，您可以嘗試在管理員選單中，將目前辨識不靈敏的指紋刪除，然後再重新錄製一次。
 
-如果嘗試了以上步驟後，指紋辨識仍然不靈敏，那可能需要進一步檢查，例如是否為主機板韌體相關的問題。屆時可能需要安排專業人員進行檢修。
-
-希望這些建議能幫助您解決問題！
+如果嘗試了這些步驟後，指紋辨識仍然不靈敏，請再告訴我，我們可以進一步協助您。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -108,7 +119,7 @@
 
 >>> [demo] 清潔過感應區了還是一樣
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (72 字元)
+  [pre_process] 已載入 demo 的輪廓 (289 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 9 <= 閾值 10，跳過壓縮
   [router] 正在分類意圖...
@@ -117,28 +128,26 @@
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: tool_calls
   [troubleshooter:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_troubleshooting: 正在檢索 'Philips Alpha 指紋辨識不靈敏 故障排除'...
+  [Tool 呼叫] db_troubleshooting: 正在檢索 'Philips Alpha 指紋辨識不靈敏 清潔後無改善不大'...
   [Tool 結果] db_troubleshooting: 回傳 545 字元
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！很抱歉清潔感應...
+  [merge_answers] 最終回覆: 您好！很抱歉清潔過感...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo 的輪廓
+  [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！很抱歉清潔感應區後指紋辨識還是不靈敏，這確實會造成不便。
+[回覆] 您好！很抱歉清潔過感應區後，指紋辨識不靈敏的問題還是沒有改善。
 
-根據您描述的狀況，我為您整理了幾個進一步的排查步驟，請您試試看：
+根據您描述的狀況，我們可以再試試看以下幾個排查步驟：
 
-1.  確認手指狀況：請確保您的手指沒有汗水、油污，或是不是太乾燥。有時候這些小細節會影響辨識喔。
-2.  檢查感應區：請再仔細檢查一下指紋感應區，看看有沒有明顯的刮痕，因為嚴重的刮痕可能會影響感應。
-3.  換個手指試試：您可以試著用不同的手指來進行指紋辨識，看看是不是特定手指的問題。
-4.  重啟門鎖：這個方法通常很有效！請您將門鎖內部的電池拔除，等待大約 10 秒後再重新裝入。
-5.  重新錄製指紋：如果重啟後還是不行，您可以進入管理員選單，將目前設定的指紋刪除，然後再重新錄製一次。
+1.  確認手指狀況：請您再確認一下，在感應指紋時，手指上是否有汗水、油污，或是手指會不會太乾燥呢？這些都可能會影響指紋辨識的靈敏度喔。
+2.  檢查感應區：請您仔細檢查一下指紋感應區，看看是否有明顯的刮痕，因為嚴重的刮痕可能會影響感應效果。
+3.  嘗試不同手指：您可以試著用其他已經錄製好的手指來解鎖，看看是否也有同樣不靈敏的狀況。
+4.  重新啟動門鎖：請您將電子鎖內部的電池拔除，等待大約 10 秒鐘後再重新裝入，這樣可以讓門鎖重新啟動。
+5.  重新錄製指紋：如果以上方法都試過了，您可以嘗試進入管理員選單，將目前不靈敏的指紋刪除，然後再重新錄製一次。有時候重新錄製可以改善辨識效果。
 
-如果以上步驟都試過了，指紋辨識還是不靈敏，那有可能是主機板韌體的問題，這時候就需要安排原廠的韌體更新了。
-
-您可以先試試看這些方法，如果還是有問題，再告訴我喔！
+請您試試看這些方法，如果還是沒有改善，再告訴我喔！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -155,9 +164,9 @@
 
 >>> [demo] 電池快沒電會有什麼提示嗎？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (72 字元)
+  [pre_process] 已載入 demo 的輪廓 (227 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 已生成摘要 (248 字元)
+  [manage_memory] 已生成摘要 (325 字元)
   [manage_memory] 刪除 9 條舊訊息，保留 4 條
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['general_knowledge']
@@ -165,27 +174,23 @@
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: tool_calls
   [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_smartlock_manual: 正在檢索 'Philips Alpha 電池快沒電會有什麼提示'...
+  [Tool 呼叫] db_smartlock_manual: 正在檢索 'Philips Alpha 電池快沒電提示'...
   [Tool 結果] db_smartlock_manual: 回傳 584 字元
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 很抱歉，目前資料庫中...
+  [merge_answers] 最終回覆: 您好！關於 Phil...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo 的輪廓
+  [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 很抱歉，目前資料庫中沒有找到 Philips Alpha 電子鎖在電池快沒電時會有什麼提示的具體資訊。
+[回覆] 您好！關於 Philips Alpha 電子鎖電池快沒電的提示，我在資料庫中沒有找到具體的說明。
 
-不過，一般電子鎖在電量不足時，通常會有以下幾種提示方式：
+不過，一般電子鎖在電池電量較低時，通常會有以下幾種提示方式：
+1.  語音提示：在開鎖或關鎖時，會發出「電量不足」或類似的語音提醒。
+2.  燈光指示：面板上的指示燈可能會閃爍紅色或其他顏色，以表示電量低。
+3.  螢幕顯示：如果電子鎖有螢幕，可能會直接顯示電池電量不足的圖示或文字。
 
-1.  語音提示：開關門時會發出「電量不足」或類似的語音提醒。
-2.  燈光提示：面板上的指示燈會閃爍紅燈或特定顏色的燈光。
-3.  螢幕顯示：如果電子鎖有螢幕，會顯示電池電量低的圖示或文字。
-4.  App 通知：如果電子鎖有連接手機 App，App 會推播低電量通知。
-
-建議您可以檢查一下您的 Philips Alpha 電子鎖說明書，或是注意門鎖在使用時是否有任何異常的語音、燈光或螢幕顯示。
-
-如果您需要更詳細的資訊，可以提供更多關於您的 Philips Alpha 型號資訊，我會再嘗試協助您查詢。
+建議您可以留意電子鎖在操作時是否有上述的提示。如果仍不確定，可以參考產品說明書，或是提供更詳細的使用情境，我會再嘗試協助您。
 [路徑]
 ├── pre_process
 ├── manage_memory → summarized
@@ -197,8 +202,8 @@
 ├── merge_answers
 ├── update_profile
 └── post_process
-[記憶] messages=7, summary=248字
-[摘要] Philips Alpha 電...
+[記憶] messages=7, summary=325字
+[摘要] **產品/品牌/型號：** P...
 
 
 >>> [demo_ood] 今天台北天氣如何？
@@ -210,13 +215,14 @@
   [router] 意圖分類結果: ['out_of_domain']
   [router] 直接處理 out_of_domain...
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！很抱歉，我主要...
+  [merge_answers] 最終回覆: 您好！很抱歉，我無法...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo_ood 的輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！很抱歉，我主要負責電子鎖與智慧門鎖的產品、安裝、故障排除及售後服務相關問題，無法提供天氣資訊喔。
+[回覆] 您好！很抱歉，我無法提供天氣資訊。
 
-如果您有任何關於電子鎖或智慧門鎖的疑問，例如產品選購、安裝諮詢、使用問題或售後服務，都非常歡迎隨時提出，我會盡力為您服務！
+我主要負責處理電子鎖、智慧門鎖的產品諮詢、安裝、故障排除及售後服務等相關問題。
+
+若您有任何關於電子鎖或智慧門鎖的疑問，都非常歡迎您提出，我會盡力協助您！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -238,37 +244,41 @@
   [web_researcher:agent_llm] LLM 正在思考...
   [order_clerk:agent_llm] 回應類型: tool_calls
   [order_clerk:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_order_api: 正在檢索 '查詢訂單 ORD-20260301 的進度'...
+  [Tool 呼叫] db_order_api: 正在檢索 '查詢訂單 ORD-20260301 進度'...
   [Tool 結果] db_order_api: 回傳 128 字元
   [order_clerk:agent_llm] LLM 正在思考...
   [web_researcher:agent_llm] 回應類型: tool_calls
   [web_researcher:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_web_search: 正在檢索 '支援 HomeKey 的電子鎖推薦鎖'...
+  [Tool 呼叫] db_web_search: 正在檢索 '支援 HomeKey 的電子鎖推薦'...
   [order_clerk:agent_llm] 回應類型: text
-  [Tool 結果] db_web_search: 回傳 1184 字元
+  [Tool 結果] db_web_search: 回傳 927 字元
   [web_researcher:agent_llm] LLM 正在思考...
   [web_researcher:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
   [merge_answers] 合併 2 段 agent 回覆...
-  [merge_answers] 最終回覆: 您好！很高興為您服務...
+  [merge_answers] 最終回覆: 您好！關於您的訂單 ...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo_multi 的輪廓
+  [update_profile] fact 寫入: device_model=Alpha 指紋電子鎖
+  [update_profile] fact 寫入: device_brand=Philips
+  [update_profile] 已更新 demo_multi 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！很高興為您服務。
+[回覆] 您好！關於您的訂單 ORD-20260301，查詢結果如下：
 
-關於您的訂單 ORD-20260301，查詢結果如下：
-1. 訂單編號：ORD-20260301
-2. 商品：Philips Alpha 指紋電子鎖
-3. 狀態：已出貨
-4. 物流：黑貓宅急便（追蹤碼：TC-20260302-001）
-5. 預計到貨：2026 年 3 月 4 日下午
-6. 備註：商品已於 3/2 從台北倉庫出貨
+訂單編號：ORD-20260301
+商品：Philips Alpha 指紋電子鎖
+狀態：已出貨
+物流：黑貓宅急便（追蹤碼：TC-20260302-001）
+預計到貨：2026 年 3 月 4 日下午
+備註：商品已於 3/2 從台北倉庫出貨
 
-關於您詢問支援 HomeKey 的電子鎖，雖然我們的服務主要聚焦於電子鎖的訂單查詢、安裝、故障排除與售後服務，但仍樂意為您提供一些參考資訊：
-1. Aqara A100 智能電子鎖：這款電子鎖支援 Apple HomeKey，並整合了米家App。它在小米生態系中很受歡迎，主打多平台連動和防水設計，很適合已經使用米家或 Apple HomeKit 的家庭，可以用手機或智慧手錶來開門。
-2. 您也可以參考一些相關指南，例如「15 Best Smart Locks for Apple HomeKey Users in 2026」，這類型的文章會列出更多支援 HomeKey 的智慧鎖選擇。
+至於您詢問推薦支援 HomeKey 的電子鎖，我們理解您對此功能的需求。目前直接推薦支援 HomeKey 的特定型號資訊相對較少，但您可以參考以下一般性的電子鎖選購資訊：
+1. 台灣推薦王有整理「電子鎖推薦十大精選排行榜」。
+2. myfone.blog 有文章說明「電子鎖怎麼挑選？一次看懂智慧門鎖4大挑選重點與電子鎖推薦」。
+3. TikTok 上有提到「moorgen T5 電子鎖」。
 
-希望這些資訊對您有幫助。如果您還有其他關於訂單或電子鎖的相關問題，都歡迎隨時提出喔！
+為確保資訊的準確性，建議您直接查詢您感興趣品牌的官方網站，或諮詢我們的產品銷售部門，他們將能提供更詳細的 HomeKey 功能支援資訊與推薦。
+
+請問您還有其他關於電子鎖的問題嗎？例如安裝、故障排除或售後服務方面，我們很樂意為您提供協助。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -299,7 +309,9 @@
   [merge_answers] 最終回覆: 您好
 麻煩您確認並補...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo_human 的輪廓
+  [update_profile] fact 寫入: phone=0912-345-678
+  [update_profile] fact 寫入: address=台北市信義區松仁路 100 號 12 樓
+  [update_profile] 已更新 demo_human 的軟輪廓
   [post_process] 回傳最終回覆...
 [回覆] 您好
 麻煩您確認並補充以下資訊
@@ -317,6 +329,9 @@
 ├── update_profile
 └── post_process
 
+[Facts] demo_human:
+  address         = 台北市信義區松仁路 100 號 12 樓           [CURRENT] 2026-03-15 15:44:35 ~ —
+  phone           = 0912-345-678                   [CURRENT] 2026-03-15 15:44:30 ~ —
 
 >>> [demo_guardrail] 這款電子鎖多少錢？可以報價嗎？
   [pre_process] 正在準備輸入...
@@ -330,7 +345,7 @@
   [merge_answers] 最終回覆: 您好
 麻煩您留下以下...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo_guardrail 的輪廓
+  [update_profile] 已更新 demo_guardrail 的軟輪廓
   [post_process] 回傳最終回覆...
 [回覆] 您好
 麻煩您留下以下資訊
@@ -348,8 +363,101 @@
 ├── update_profile
 └── post_process
 
+
+>>> [demo_human] 我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓
+  [pre_process] 正在準備輸入...
+  [pre_process] 已載入 demo_human 的輪廓 (150 字元)
+  [manage_memory] 檢查是否需要壓縮記憶...
+  [manage_memory] 訊息數 2 <= 閾值 10，跳過壓縮
+  [router] 正在分類意圖...
+  [router] 意圖分類結果: ['general_knowledge']
+  [router] 派發目標: ['product_expert']
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] transfer_to_human: user_id=0912-345-678
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: text
+  [merge_answers] 正在提取並合併回覆...
+  [merge_answers] 最終回覆: 好的，我們已經收到您...
+  [update_profile] 正在更新使用者輪廓...
+  [update_profile] fact 寫入: address=新北市板橋區文化路一段 200 號 5 樓
+  [post_process] 回傳最終回覆...
+[回覆] 好的，我們已經收到您更新的地址資訊：新北市板橋區文化路一段 200 號 5 樓。
+
+請問您在電子鎖或智慧門鎖方面有什麼需要協助的地方嗎？
+[路徑]
+├── pre_process
+├── manage_memory → skip
+├── router → product_expert
+├── product_expert
+│   ├── agent_llm
+│   ├── tool_node
+│   └── agent_llm
+├── merge_answers
+├── [FLAG] topic_resolved
+├── update_profile
+└── post_process
+
+[Facts] demo_human:
+  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-15 15:44:36 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-15 15:44:35 ~ 2026-03-15 15:44:36
+  phone           = 0912-345-678                   [CURRENT] 2026-03-15 15:44:30 ~ —
+
+>>> [demo_human] 我要找真人客服，請幫我轉接真人
+  [pre_process] 正在準備輸入...
+  [pre_process] 已載入 demo_human 的輪廓 (151 字元)
+  [manage_memory] 檢查是否需要壓縮記憶...
+  [manage_memory] 訊息數 6 <= 閾值 10，跳過壓縮
+  [router] 正在分類意圖...
+  [router] 意圖分類結果: ['transfer_human']
+  [router] 直接處理 transfer_human...
+  [Tool 呼叫] transfer_to_human: user_id=demo_human
+  [merge_answers] 正在提取並合併回覆...
+  [merge_answers] 最終回覆: 您好
+麻煩您確認並補...
+  [update_profile] 正在更新使用者輪廓...
+  [update_profile] 已更新 demo_human 的軟輪廓
+  [post_process] 回傳最終回覆...
+[回覆] 您好
+麻煩您確認並補充以下資訊
+聯絡地址：新北市板橋區文化路一段 200 號 5 樓
+電話：0912-345-678
+設備品牌型號：
+安裝日期：
+另外再麻煩您錄影整個狀況的影片將其上傳，謝謝您
+[路徑]
+├── pre_process
+├── manage_memory → skip
+├── router → transfer_human
+├── [FLAG] topic_resolved
+├── merge_answers
+├── update_profile
+└── post_process
+
 ========================================
-[最終] thread=demo, messages=7, summary=248字
-[摘要] Philips Alpha 電子鎖相關問題。
-1.  **指紋設定**：使用者詢問 Philips Alpha 指紋設定方法。客服告知此型號最多可設定 100 組指紋，建議使用者參考產品手冊，或可提供通用設定步驟。狀態：待使用者確認。
-2.  **指紋辨識不靈敏**：使用者反映 Philips Alpha 指紋辨識不靈敏，按多次才能開門，且已清潔感應區但問題仍存在。客服建議檢查手指狀況、嘗試不同手指、重啟門鎖、重新錄製指紋。若嘗試上述步驟後問題持續，可能需安排專業人員進行檢修。狀態：進行中。
+[最終] thread=demo, messages=7, summary=325字
+[摘要] **產品/品牌/型號：** Philips Alpha 電子鎖
+
+**問題與狀態：**
+1.  **指紋設定方式：** 使用者曾詢問設定方法，客服提供了產品規格及一般設定建議，並建議參考說明書。此問題已轉為指紋辨識不靈敏的後續處理。
+2.  **指紋辨識不靈敏：** (進行中) 使用者反映 Philips Alpha 電子鎖指紋辨識需多次嘗試才能解鎖。
+    *   **已嘗試排查：** 使用者已清潔指紋感應區，但問題仍存在。
+    *   **客服建議排查：** 確認手指乾淨、檢查感應區有無刮痕/髒污、嘗試不同手指、重啟電子鎖、刪除並重新錄製指紋。
+
+**目前狀況：** 清潔感應區後指紋辨識仍不靈敏，客服建議的其他排查步驟待使用者嘗試。
+
+========================================
+[Facts 總覽]
+[Facts] demo:
+  device_brand    = Philips                        [CURRENT] 2026-03-15 15:43:20 ~ —
+  device_model    = Alpha                          [CURRENT] 2026-03-15 15:43:09 ~ —
+[Facts] demo_human:
+  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-15 15:44:36 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-15 15:44:35 ~ 2026-03-15 15:44:36
+  phone           = 0912-345-678                   [CURRENT] 2026-03-15 15:44:30 ~ —
+[Facts] demo_ood: (無記錄)
+[Facts] demo_multi:
+  device_brand    = Philips                        [CURRENT] 2026-03-15 15:44:29 ~ —
+  device_model    = Alpha 指紋電子鎖                    [CURRENT] 2026-03-15 15:43:20 ~ —
+[Facts] demo_guardrail: (無記錄)
