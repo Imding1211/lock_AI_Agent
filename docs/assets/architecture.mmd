@@ -79,8 +79,8 @@ graph TD
 
     subgraph data_stores ["外部資料源"]
         direction LR
-        chroma_manual[("Chroma DB<br/><small>產品手冊</small>")]
-        chroma_trouble[("Chroma DB<br/><small>故障排除</small>")]
+        pgvec_manual[("pgvector<br/><small>產品手冊</small>")]
+        pgvec_trouble[("pgvector<br/><small>故障排除</small>")]
         order_api[("Order API<br/><small>訂單 / 維修單</small>")]
         duckduckgo[("DuckDuckGo<br/><small>網頁搜尋</small>")]
     end
@@ -147,8 +147,8 @@ graph TD
     tool_transfer --- WR_TOOL
 
     %% Tool → Data Store connections
-    tool_manual --- chroma_manual
-    tool_trouble --- chroma_trouble
+    tool_manual --- pgvec_manual
+    tool_trouble --- pgvec_trouble
     tool_order --- order_api
     tool_web --- duckduckgo
 
@@ -159,9 +159,9 @@ graph TD
     webhook -.->|"user_raw"| audit_store
     langgraph_reply -.->|"user + ai"| audit_store
 
-    %% Embedding connections
-    EMBEDDING_ENGINE -..- chroma_manual
-    EMBEDDING_ENGINE -..- chroma_trouble
+    %% Embedding connections (Per-DB，各資料庫獨立設定)
+    EMBEDDING_ENGINE -..- pgvec_manual
+    EMBEDDING_ENGINE -..- pgvec_trouble
 
     %% LLM connections
     LLM_ENGINE -..- manage_memory
@@ -193,7 +193,7 @@ graph TD
     class router router_style
     class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
     class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
-    class chroma_manual,chroma_trouble,order_api,duckduckgo datastore
+    class pgvec_manual,pgvec_trouble,order_api,duckduckgo datastore
     class profile_store,sqlite_store,audit_store persist
     class LLM_ENGINE,EMBEDDING_ENGINE llm_style
     class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style

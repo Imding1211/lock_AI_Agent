@@ -18,7 +18,7 @@ uvicorn app:app --reload
 # Run CLI test scenarios (no LINE Bot needed)
 python main.py
 
-# Seed ChromaDB with demo data (clears and rebuilds both vector stores)
+# Seed vector stores with demo data (pgvector; requires Docker pgvector running)
 python scripts/seed_db.py
 
 # Run mock order API server (for testing db_order_api retriever)
@@ -52,7 +52,7 @@ Nearly everything is configured via `config.toml`, parsed by `core/config.py`:
 - **`[system]`** — Domain definition for the chatbot
 - **`[debounce]`** — Message buffering settings (`buffer_wait` seconds)
 - **`[llm]`** — Provider (`ollama`/`gemini`/`vertexai`), model name, temperature
-- **`[[databases]]`** — Ordered retriever definitions (type: `chroma`, `api`, `web_search`); chroma databases must include `embedding_provider`, `embedding_model` and related fields inline (no global embedding fallback)
+- **`[[databases]]`** — Retriever definitions (type: `pgvector`, `chroma`, `api`, `web_search`); vector databases must include `embedding_provider`, `embedding_model` and related fields inline (no global embedding fallback)
 - **`[[intents]]`** — Intent routing rules mapping intent names to target retriever nodes
 - **`[required_slots]`** — Slot filling requirements (e.g., `device_model`, `device_brand`)
 - **`[memory]`** — Checkpointer type (`memory`/`sqlite`/`postgres`) + summarization config
@@ -71,7 +71,7 @@ New providers/tools are added by:
 2. Registering it in the `__init__.py` registry dict
 
 Registries:
-- **`tools/__init__.py`** — `REGISTRY` maps type strings (`chroma`, `api`, `web_search`) to tool/retriever classes. All retrievers extend `BaseRetriever(BaseTool)` (in `tools/base_retriever.py`) with `setup()`, `async aretrieve()`, and `as_langchain_tool()`. Non-retriever tools (e.g. `TransferHumanTool`) extend `BaseTool` (in `tools/base.py`) directly.
+- **`tools/__init__.py`** — `REGISTRY` maps type strings (`pgvector`, `chroma`, `api`, `web_search`) to tool/retriever classes. All retrievers extend `BaseRetriever(BaseTool)` (in `tools/base_retriever.py`) with `setup()`, `async aretrieve()`, and `as_langchain_tool()`. Non-retriever tools (e.g. `TransferHumanTool`) extend `BaseTool` (in `tools/base.py`) directly.
 - **`llms/__init__.py`** — `LLM_REGISTRY` maps provider strings to builder functions
 - **`embeddings/__init__.py`** — `REGISTRY` maps embedding provider strings to builder functions
 - **`storage/__init__.py`** — `STORAGE_REGISTRY` maps storage type strings to builder functions (audit log)

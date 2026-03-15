@@ -1,12 +1,14 @@
 from langchain_core.tools import StructuredTool
 from core.config import DB_CONFIG
 from .chroma_store import ChromaRetriever
+from .pgvector_store import PGVectorRetriever
 from .api_store import APIStoreRetriever
 from .web_search import WebSearchRetriever
 from .transfer_human import TransferHumanTool
 
 REGISTRY = {
     "chroma": ChromaRetriever,
+    "pgvector": PGVectorRetriever,
     "api": APIStoreRetriever,
     "web_search": WebSearchRetriever,
 }

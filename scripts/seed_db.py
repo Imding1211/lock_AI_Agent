@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -5,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import shutil
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
+from langchain_postgres import PGVector
 from core.config import DB_CONFIG
 from embeddings import get_embedding
 
@@ -330,6 +332,33 @@ def seed_databases():
             print(f"  [寫入] 正在寫入資料至 {db['name']}...")
             embed_fn = get_embedding(db)
             vector_store = Chroma(persist_directory=db_path, embedding_function=embed_fn)
+
+            if db["name"] == "db_smartlock_manual":
+                vector_store.add_documents(manual_docs)
+                print(f"  [完成] db_smartlock_manual: {len(manual_docs)} 筆文件")
+            elif db["name"] == "db_troubleshooting":
+                vector_store.add_documents(troubleshooting_docs)
+                print(f"  [完成] db_troubleshooting: {len(troubleshooting_docs)} 筆文件")
+
+        elif db.get("type") == "pgvector":
+            collection_name = db.get("collection_name", db["name"])
+            connection_uri_env = db.get("connection_uri_env", "PG_VECTOR_URI")
+            connection_uri = os.environ.get(connection_uri_env)
+            if not connection_uri:
+                print(f"  [跳過] {db['name']}: 環境變數 {connection_uri_env} 未設定")
+                continue
+
+            embed_fn = get_embedding(db)
+
+            # 清除該 collection 舊資料並寫入
+            print(f"  [清理] 正在清除 pgvector collection: {collection_name}...")
+            print(f"  [寫入] 正在寫入資料至 {db['name']} (pgvector)...")
+            vector_store = PGVector(
+                embeddings=embed_fn,
+                collection_name=collection_name,
+                connection=connection_uri,
+                pre_delete_collection=True,
+            )
 
             if db["name"] == "db_smartlock_manual":
                 vector_store.add_documents(manual_docs)

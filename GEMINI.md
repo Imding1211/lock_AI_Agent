@@ -4,7 +4,7 @@
 
 ## 專案概覽
 
-- **核心技術 stack**: Python, LangGraph, FastAPI, ChromaDB, OpenAI/Gemini/Ollama, LINE Messaging SDK v3。
+- **核心技術 stack**: Python, LangGraph, FastAPI, pgvector, OpenAI/Gemini/Ollama, LINE Messaging SDK v3。
 - **架構模式**: 採用「路由 → 專職 Agent」的多 Agent 架構，並支援透過 `Send()` 進行平行派發。
 - **主要功能**:
     - **產品專家**: 回答規格與設定問題（RAG）。
@@ -49,7 +49,7 @@ graph TD
 ```bash
 python seed_db.py
 ```
-這會建立 `./chroma_db_default` (產品手冊) 與 `./chroma_db_troubleshoot` (故障排除)。
+這會寫入 pgvector 的 `smartlock_manual` 與 `troubleshooting` collection。
 
 ### 3. 執行測試與服務
 - **CLI 測試 (劇本展示)**:
@@ -88,6 +88,6 @@ python seed_db.py
 - `app.py`: FastAPI 入口，處理 LINE Webhook、訊息緩衝與 Loading 動畫。
 - `graph/builder.py`: LangGraph 圖表的核心建構邏輯。
 - `graph/nodes.py`: 各個節點（Router, Agent, Post-process）的具體實作。
-- `tools/`: 封裝了 ChromaDB、API、Web Search 的檢索邏輯與 transfer_to_human 工具（一檔案一工具）。
+- `tools/`: 封裝了 pgvector、API、Web Search 的檢索邏輯與 transfer_to_human 工具（一檔案一工具）。
 - `core/config.py`: 負責解析 `config.toml` 並提供全域配置物件。
 - `user_profiles/`: 存放持久化的使用者個人化資訊 (JSON 格式)。

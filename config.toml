@@ -2,7 +2,7 @@
 # 客服系統 - 核心設定檔 (config.toml)
 # ==========================================
 # 說明：
-# 1. 本檔案定義系統所有可配置的行為，共 14 個區塊。
+# 1. 本檔案定義系統所有可配置的行為，共 13 個區塊。
 # 2. 帶有資安機密性質的資料，請寫在對應的 `_env` 變數中，並由 .env 檔案提供。
 # 3. 若不需要某個功能，將該區塊全數加上 # 註解即可。
 #
@@ -12,7 +12,7 @@
 #   3. [line_bot]        — LINE Bot 設定
 #   4. [templates]       — 系統回覆範本
 #   5. [llm]             — 語言模型設定
-#   6. [[databases]]     — 檢索工具定義（順序 = 優先級）
+#   6. [[databases]]     — 檢索工具定義（支援 chroma / pgvector / api / web_search）
 #   7. [[agents]]        — Agent 定義
 #   8. [[intents]]       — 意圖路由設定
 #   9. [memory]          — 對話記憶與摘要壓縮
@@ -81,32 +81,34 @@ location_env   = "VERTEX_LOCATION"     # .env 中的 GCP 區域（例: us-centra
 
 # ==========================================
 # 6. 檢索工具定義 (Databases / Retrievers)
-#    陣列順序即為優先級，Agent 透過 tools 欄位引用
+#    Agent 透過 tools 欄位引用對應的資料庫名稱
 # ==========================================
 
 [[databases]]
-name        = "db_smartlock_manual"
-type        = "chroma"
-description = "智能門鎖規格、設定與保固手冊"
-path        = "./data/db/chroma_db_default"
-top_k       = 3
+name               = "db_smartlock_manual"
+type               = "pgvector"
+description        = "智能門鎖規格、設定與保固手冊"
+collection_name    = "smartlock_manual"
+connection_uri_env = "PG_VECTOR_URI"
+top_k              = 3
 embedding_provider       = "vertexai"
 embedding_model          = "text-embedding-004"
 embedding_project_id_env = "VERTEX_PROJECT_ID"
 embedding_location_env   = "VERTEX_LOCATION"
-# embedding_dimensions   = 768                   # (選填) 自訂向量維度
+embedding_dimensions     = 768
 
 [[databases]]
-name        = "db_troubleshooting"
-type        = "chroma"
-description = "常見故障排除與維修指南"
-path        = "./data/db/chroma_db_troubleshoot"
-top_k       = 2
+name               = "db_troubleshooting"
+type               = "pgvector"
+description        = "常見故障排除與維修指南"
+collection_name    = "troubleshooting"
+connection_uri_env = "PG_VECTOR_URI"
+top_k              = 2
 embedding_provider       = "vertexai"
 embedding_model          = "text-embedding-004"
 embedding_project_id_env = "VERTEX_PROJECT_ID"
 embedding_location_env   = "VERTEX_LOCATION"
-# embedding_dimensions   = 768
+embedding_dimensions     = 768
 
 [[databases]]
 name        = "db_order_api"

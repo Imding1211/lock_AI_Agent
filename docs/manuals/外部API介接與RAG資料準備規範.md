@@ -6,7 +6,7 @@
 
 ## 1. RAG 知識庫資料準備 (Vector DB)
 
-系統目前的示範資料直接定義於 `scripts/seed_db.py` 腳本中。執行該腳本會將內建的 Document 物件寫入 ChromaDB 向量庫。
+系統目前的示範資料直接定義於 `scripts/seed_db.py` 腳本中。執行該腳本會將內建的 Document 物件寫入 pgvector 向量庫。
 
 ### 1.1 資料內容規範
 *   **目前位置**：資料定義在 `scripts/seed_db.py` 的 `manual_docs`（產品手冊）與 `troubleshooting_docs`（故障排除）清單中。
@@ -21,7 +21,7 @@
 ### 1.3 更新知識庫流程
 1.  修改 `scripts/seed_db.py` 中的 `manual_docs` 或 `troubleshooting_docs` 列表，加入新的 Document 物件。
 2.  執行腳本：`python scripts/seed_db.py`。
-3.  該腳本會自動根據 `config.toml` 中的 `[[databases]]` 路徑清理舊資料並重建索引。
+3.  該腳本會根據 `config.toml` 中的 `[[databases]]` 設定清理舊 collection 並重建索引（pgvector 使用 `pre_delete_collection`）。
 
 ---
 
@@ -49,7 +49,7 @@
 
 ## 3. 嵌入模型切換 (Embeddings)
 
-目前的預設模型是 Ollama 的 `nomic-embed-text`。若需切換至更高精度的模型（如 OpenAI 或 Vertex AI）：
+目前使用 Vertex AI 的 `text-embedding-004`（各 `[[databases]]` 獨立配置）。若需切換至其他模型：
 1.  **新增 Embedding Provider**：參考 `docs/系統擴充開發指南.md` 實作新的 provider。
-2.  **更新設定**：在 `config.toml` 中將對應 `[[databases]]` 的 `embedding_provider` 欄位進行修改。
+2.  **更新設定**：在 `config.toml` 對應的 `[[databases]]` 中修改 `embedding_provider`、`embedding_model` 等欄位。
 3.  **注意**：更換 Embedding 模型後，**必須**重新建立所有向量資料庫，否則會出現向量維度不匹配的錯誤。
