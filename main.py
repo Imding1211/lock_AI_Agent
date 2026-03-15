@@ -1,5 +1,6 @@
 # main.py
 import os
+import glob
 import logging
 import warnings
 import asyncio
@@ -9,6 +10,27 @@ warnings.filterwarnings("ignore", message="Your application has authenticated us
 
 from graph.builder import build_graph
 from memory import close_checkpointer
+
+
+def clean_test_data():
+    """清除測試資料，確保每次測試從乾淨狀態開始。"""
+    removed = []
+
+    # 清除對話記憶 DB
+    for db in ("data/db/chat_history.db", "data/db/audit_log.db"):
+        if os.path.exists(db):
+            os.remove(db)
+            removed.append(db)
+
+    # 清除使用者輪廓
+    for f in glob.glob("data/profiles/*.md"):
+        os.remove(f)
+        removed.append(f)
+
+    if removed:
+        print(f"[清除] 已刪除 {len(removed)} 個檔案: {', '.join(removed)}")
+    else:
+        print("[清除] 無需清除，已是乾淨狀態")
 
 
 def _is_agent_step(item):
@@ -120,6 +142,7 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 
 if __name__ == "__main__":
     async def main():
+        clean_test_data()
         app = await build_graph()
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
         
