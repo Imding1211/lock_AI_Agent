@@ -84,10 +84,16 @@ location_env   = "VERTEX_LOCATION"     # .env 中的 GCP 區域（例: us-centra
 # 6. 向量模型設定 (Embedding)
 # ==========================================
 [embedding]
-provider     = "ollama"              # 支援: "ollama"（未來可擴充 "openai" 等）
-model        = "nomic-embed-text"    # Embedding 模型名稱
-base_url     = "http://localhost:11434"
-base_url_env = "OLLAMA_BASE_URL"     # 優先讀取環境變數，若為空則使用上方 base_url
+provider       = "vertexai"              # 支援: "ollama" | "vertexai"
+model          = "text-embedding-004"    # Embedding 模型名稱
+project_id_env = "VERTEX_PROJECT_ID"     # .env 中的 GCP 專案 ID
+location_env   = "VERTEX_LOCATION"       # .env 中的 GCP 區域（例: us-central1）
+
+# Ollama Embedding 專用
+# provider     = "ollama"
+# model        = "nomic-embed-text"
+# base_url     = "http://localhost:11434"
+# base_url_env = "OLLAMA_BASE_URL"     # 優先讀取環境變數，若為空則使用上方 base_url
 
 
 # ==========================================

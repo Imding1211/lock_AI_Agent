@@ -80,8 +80,11 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
     inputs = {"question": query}
     config = {"configurable": {"thread_id": thread_id, "user_id": thread_id}}
 
-    prev_state = await app.aget_state(config)
-    prev_len = len(prev_state.values.get("history", [])) if prev_state.values else 0
+    try:
+        prev_state = await asyncio.wait_for(app.aget_state(config), timeout=10)
+        prev_len = len(prev_state.values.get("history", [])) if prev_state.values else 0
+    except asyncio.TimeoutError:
+        prev_len = 0
 
     final = await app.ainvoke(inputs, config=config)
 
@@ -101,13 +104,16 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
         print(f"原始數據: {current_history}")
 
     if show_memory:
-        state = await app.aget_state(config)
-        vals = state.values or {}
-        msgs = vals.get("messages", [])
-        summary = vals.get("summary", "")
-        print(f"[記憶] messages={len(msgs)}, summary={len(summary)}字")
-        if summary:
-            print(f"[摘要] {summary[:15]}...")
+        try:
+            state = await asyncio.wait_for(app.aget_state(config), timeout=10)
+            vals = state.values or {}
+            msgs = vals.get("messages", [])
+            summary = vals.get("summary", "")
+            print(f"[記憶] messages={len(msgs)}, summary={len(summary)}字")
+            if summary:
+                print(f"[摘要] {summary[:15]}...")
+        except asyncio.TimeoutError:
+            print("[記憶] (aget_state 超時，跳過)")
 
     print()
 
@@ -116,7 +122,7 @@ if __name__ == "__main__":
     async def main():
         app = await build_graph()
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
-        """
+        
         # --- 第 1 輪：產品問題 → product_expert + manage_memory:skip ---
         await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
         
@@ -143,7 +149,7 @@ if __name__ == "__main__":
             "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
             thread_id="demo_human"
         )
-        """
+        
         # --- 敏感詞護欄 → guardrail_triggered（跳過 LLM，強制轉接真人）---
         await run_test(app,
             "這款電子鎖多少錢？可以報價嗎？",
@@ -158,13 +164,16 @@ if __name__ == "__main__":
             print(f"[SQLite] {db_path} = {os.path.getsize(db_path):,} bytes")
 
         config = {"configurable": {"thread_id": T, "user_id": T}}
-        state = await app.aget_state(config)
-        if state.values:
-            msgs = state.values.get("messages", [])
-            summary = state.values.get("summary", "")
-            print(f"[最終] thread={T}, messages={len(msgs)}, summary={len(summary)}字")
-            if summary:
-                print(f"[摘要] {summary}")
+        try:
+            state = await asyncio.wait_for(app.aget_state(config), timeout=10)
+            if state.values:
+                msgs = state.values.get("messages", [])
+                summary = state.values.get("summary", "")
+                print(f"[最終] thread={T}, messages={len(msgs)}, summary={len(summary)}字")
+                if summary:
+                    print(f"[摘要] {summary}")
+        except asyncio.TimeoutError:
+            print("[警告] 最終 aget_state 超時，跳過")
         
         await asyncio.sleep(0.5)
         try:

@@ -1,21 +1,18 @@
 from .ollama_embed import build_ollama_embedding
+from .vertexai_embed import build_vertexai_embedding
 
 # 註冊表：將字串對應到對應的建造函數
 REGISTRY = {
     "ollama": build_ollama_embedding,
-    # "openai": build_openai_embedding,  # 未來擴充時把這行註解打開即可
+    "vertexai": build_vertexai_embedding,
 }
 
 def get_embedding(config: dict = None):
     # 若 config 未帶 embedding_provider，fallback 至全域 EMBEDDING_CONFIG
     if not config or not config.get("embedding_provider"):
         from core.config import EMBEDDING_CONFIG
-        cfg = {
-            "embedding_provider": EMBEDDING_CONFIG.get("provider", "ollama"),
-            "embedding_model": EMBEDDING_CONFIG.get("model", "nomic-embed-text"),
-            "embedding_base_url": EMBEDDING_CONFIG.get("base_url", "http://localhost:11434"),
-            "embedding_base_url_env": EMBEDDING_CONFIG.get("base_url_env", "OLLAMA_BASE_URL"),
-        }
+        cfg = {f"embedding_{k}": v for k, v in EMBEDDING_CONFIG.items()}
+        cfg.setdefault("embedding_provider", "ollama")
     else:
         cfg = config
 

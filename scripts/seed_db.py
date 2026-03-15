@@ -131,6 +131,53 @@ def seed_databases():
             "Samsung SHP-DP609 支援 Wi-Fi，可透過 SmartThings App 遠端控制。"
             "目前市面上尚無正式支援 Apple HomeKit 的電子鎖，但部分品牌已預告將推出。"
         ), metadata={"source": "faq.txt", "category": "feature"}),
+
+        # --- 語義壓力測試：技術原理（非關鍵字語義聯結） ---
+        Document(page_content=(
+            "【技術原理：半導體指紋感應技術】\n"
+            "電子鎖採用電容式耦合感應原理偵測指紋。感應器表面由數千個微型電容感測單元組成，"
+            "當手指接觸時，指紋的脊線（凸起）與谷線（凹陷）會產生不同的電荷分佈。"
+            "感測晶片讀取這些電荷差異，即時建構出高解析度的指紋影像。\n"
+            "相較於傳統光學式感應器，電容式半導體感應具備以下優勢：\n"
+            "1. 無法被平面指紋照片欺騙（需要立體電荷變化）。\n"
+            "2. 感應速度更快（通常 0.3 秒內完成比對）。\n"
+            "3. 體積更小，適合嵌入門鎖把手中。\n"
+            "缺點：手指過於乾燥或沾水時，電荷分佈不明顯，可能導致辨識率下降。"
+        ), metadata={"source": "tech_whitepaper.txt", "category": "technology"}),
+
+        # --- 語義壓力測試：英文規格（跨語系對齊） ---
+        Document(page_content=(
+            "【Technical Spec: Emergency Power Interface】\n"
+            "All models are equipped with a USB Type-C emergency power port located at "
+            "the bottom of the exterior handle assembly. In the event of a complete battery "
+            "depletion, users may connect any standard USB-C power bank (5V/1A minimum) to "
+            "temporarily power the lock's control circuitry. Once the keypad illuminates, "
+            "the user can enter their PIN code or use fingerprint authentication to unlock "
+            "the door. Note: this port is for emergency power supply only and does not "
+            "support data transfer or firmware updates."
+        ), metadata={"source": "tech_spec_en.txt", "category": "specification", "language": "en"}),
+
+        # --- 語義壓力測試：相似字眼辨析（情境區分） ---
+        Document(page_content=(
+            "【安全規範：密碼設定限制】\n"
+            "為確保門鎖安全性，系統禁止使用以下類型的密碼：\n"
+            "1. 連續數字（連號）：如 123456、654321、234567。\n"
+            "2. 重複數字：如 111111、888888。\n"
+            "3. 常見弱密碼：如 000000、999999。\n"
+            "若使用者嘗試設定上述密碼，系統會提示「密碼強度不足，請重新設定」。\n"
+            "建議使用無規律的 6~12 位數字組合，並避免使用生日、電話號碼等容易猜測的數字。"
+        ), metadata={"source": "security_policy.txt", "category": "security"}),
+
+        Document(page_content=(
+            "【操作指南：恢復出廠設定步驟】\n"
+            "當需要完全重置門鎖時（例如搬家、更換使用者），可執行恢復出廠設定：\n"
+            "1. 打開室內側電池蓋，找到 Reset 按鈕。\n"
+            "2. 長按 Reset 鍵 10 秒，聽到長「嗶」聲後放開。\n"
+            "3. 門鎖面板會顯示「輸入確認碼」。\n"
+            "4. 在面板上輸入連續數字確認碼「1234567890」後按 # 鍵確認。\n"
+            "5. 系統將清除所有指紋、密碼、卡片資料，回到初始狀態。\n"
+            "注意：恢復出廠設定後，管理員密碼會重置為預設值「123456」，請務必立即更改。"
+        ), metadata={"source": "user_manual.txt", "category": "reset"}),
     ]
 
     # ========================================
