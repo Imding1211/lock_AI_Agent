@@ -93,7 +93,7 @@ graph TD
     end
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
-    EMBEDDING_ENGINE["Embedding Engine<br/><small>Ollama nomic-embed-text<br/>config.toml [embedding]</small>"]
+    EMBEDDING_ENGINE["Embedding Engine<br/><small>Vertex AI / Ollama<br/>各 [[databases]] 獨立設定</small>"]
 
     %% LINE → Debounce → LangGraph
     LINE_USER -->|"傳送訊息"| webhook
