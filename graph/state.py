@@ -16,3 +16,5 @@ class GraphState(TypedDict):
     history: Annotated[list, operator.add]      # 路徑追蹤（除錯用）
     summary: Annotated[str, _keep_last]           # 對話摘要（記憶體管理用）
     next_agents: Annotated[list, _keep_last]    # 多 agent 派發清單
+    ui_hints: Annotated[list, operator.add]       # UI metadata（平行分支匯流自動合併）
+    response_ui: Annotated[list, _keep_last]      # 最終 LINE Message 物件

@@ -117,6 +117,7 @@ description        = "YouTube 教學影片知識庫：電子鎖影片教學"
 collection_name    = "kb_youtube"
 connection_uri_env = "PG_VECTOR_URI"
 top_k              = 3
+ui_type            = "VIDEO_CARD"
 embedding_provider       = "vertexai"
 embedding_model          = "text-embedding-004"
 embedding_project_id_env = "VERTEX_PROJECT_ID"

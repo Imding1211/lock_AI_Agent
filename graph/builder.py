@@ -8,14 +8,14 @@ from graph.nodes import (
     llm as base_llm
 )
 from memory import get_checkpointer
-from tools import build_tools
+from tools import build_tools, UI_TYPE_MAP
 from agents import build_all_agents
 
 
 async def build_graph():
     # 建立工具 dict 與 agent 子圖
     tools_dict = build_tools()
-    agent_subgraphs = build_all_agents(AGENTS_CONFIG, tools_dict, base_llm)
+    agent_subgraphs = build_all_agents(AGENTS_CONFIG, tools_dict, base_llm, ui_type_map=UI_TYPE_MAP)
 
     # 路由函數：根據 next_agents 用 Send() 實現 fan-out
     def route_by_intent(state: GraphState):
@@ -32,7 +32,7 @@ async def build_graph():
                 agent_msgs.append(msg)
                 break
 
-        clean = {**state, "history": [], "messages": agent_msgs}
+        clean = {**state, "history": [], "messages": agent_msgs, "ui_hints": []}
 
         if not agents:
             return [Send("merge_answers", clean)]

@@ -1,9 +1,11 @@
+import json
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import SystemMessage
 from langchain_core.tools import StructuredTool
 from graph.state import GraphState
 from core.config import SYSTEM_CONFIG, REQUIRED_SLOTS
+from tools.pgvector_store import UI_METADATA_DELIMITER
 
 
 def load_prompt_template(prompt_file: str, **kwargs) -> str:
@@ -24,11 +26,12 @@ def _build_slots_section() -> str:
    如果使用者無法提供，仍可給予通用建議，但應提醒資訊不足可能影響準確度。"""
 
 
-def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredTool], llm):
+def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredTool], llm, ui_type_map: dict[str, str] | None = None):
     """為單一 agent 建構可呼叫的 subgraph（agent_llm ↔ tool_node 迴圈）"""
     agent_name = agent_config["name"]
     prompt_file = agent_config["prompt_file"]
     tool_names = agent_config.get("tools", [])
+    _ui_type_map = ui_type_map or {}
 
     # 收集此 agent 使用的工具
     agent_tools = [tools_dict[name] for name in tool_names if name in tools_dict]
@@ -74,7 +77,30 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
         async def execute_tools(state: GraphState):
             print(f"  [{agent_name}:tool_node] 正在執行工具呼叫...")
             result = await tool_node.ainvoke(state)
-            return {"messages": result["messages"], "history": [f"{agent_name}:tool_node"]}
+
+            # 攔截 metadata：從 ToolMessage 中剝離 UI_METADATA，寫入 ui_hints
+            ui_hints = []
+            for msg in result["messages"]:
+                if not (hasattr(msg, "type") and msg.type == "tool"):
+                    continue
+                tool_name = getattr(msg, "name", "")
+                if _ui_type_map.get(tool_name, "TEXT") == "TEXT":
+                    continue
+                if not (isinstance(msg.content, str) and UI_METADATA_DELIMITER in msg.content):
+                    continue
+                clean_text, raw_meta = msg.content.split(UI_METADATA_DELIMITER, 1)
+                msg.content = clean_text  # LLM 只看乾淨文字
+                try:
+                    meta = json.loads(raw_meta)
+                    ui_hints.append(meta)
+                except json.JSONDecodeError:
+                    print(f"  [{agent_name}:tool_node] UI metadata JSON 解析失敗，跳過")
+
+            return {
+                "messages": result["messages"],
+                "ui_hints": ui_hints,
+                "history": [f"{agent_name}:tool_node"],
+            }
 
         def should_continue(state: GraphState):
             last_message = state["messages"][-1]
@@ -99,12 +125,12 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
     return build_subgraph()
 
 
-def build_all_agents(agents_config: list, tools_dict: dict[str, StructuredTool], llm) -> dict:
+def build_all_agents(agents_config: list, tools_dict: dict[str, StructuredTool], llm, ui_type_map: dict[str, str] | None = None) -> dict:
     """建構所有 agent 子圖，回傳 dict[str, CompiledGraph]"""
     agents = {}
     for agent_config in agents_config:
         name = agent_config["name"]
-        subgraph = build_agent_executor(agent_config, tools_dict, llm)
+        subgraph = build_agent_executor(agent_config, tools_dict, llm, ui_type_map=ui_type_map)
         agents[name] = subgraph
         print(f"[*] 已建構 Agent: {name} — {agent_config.get('label', '')}")
     return agents

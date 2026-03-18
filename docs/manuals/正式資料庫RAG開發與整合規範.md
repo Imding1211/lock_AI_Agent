@@ -123,3 +123,54 @@ prompt_file = "agents/prompts/product_expert.md"
 2. 啟動系統：`python main.py`
 3. 確認啟動日誌出現 `[*] 已註冊工具: db_my_knowledge` 與 `[*] 維度驗證通過`
 4. 實際對話測試 Agent 能否檢索到新知識庫的內容
+
+---
+
+## 3. 配置驅動的多模態 UI (`ui_type`)
+
+### 3.1 概述
+
+透過在 `[[databases]]` 中設定 `ui_type` 欄位，可讓特定知識庫的檢索結果以 LINE FlexMessage 呈現（例如影片卡片），而非純文字。
+
+### 3.2 支援的 `ui_type` 值
+
+| 值 | 說明 |
+|------|------|
+| `TEXT`（預設）| 純文字回覆，不需額外設定 |
+| `VIDEO_CARD` | LINE FlexMessage 影片卡片。適用於 YouTube 教學影片知識庫 |
+
+### 3.3 `VIDEO_CARD` 的 metadata 要求
+
+當 `ui_type = "VIDEO_CARD"` 時，pgvector collection 中每筆文件的 **metadata 必須包含**：
+
+| 欄位 | 說明 | 範例 |
+|------|------|------|
+| `source` | 影片完整 URL（YouTube） | `https://www.youtube.com/watch?v=xxxx` |
+| `title` | 影片標題 | `電子鎖安裝教學 - 基本步驟` |
+
+系統會自動從 `source` URL 提取 YouTube video_id 並組合縮圖網址。若 metadata 缺少 `source` 或 URL 格式不正確，該筆文件會被自動跳過（降級為純文字回覆）。
+
+### 3.4 運作機制
+
+1. **Retriever 層**：`PGVectorRetriever.aretrieve()` 偵測到 `ui_type != "TEXT"` 時，在回傳字串尾部附加 JSON metadata 區塊（以 `===UI_METADATA===` 分隔符隔開）
+2. **Agent 層**：`execute_tools()` 攔截 ToolMessage，剝離 metadata 後寫入 `state["ui_hints"]`，LLM 只看到乾淨文字
+3. **Post-process 層**：`post_process` 呼叫 `build_line_messages()` 將 `ui_hints` 轉為 LINE FlexMessage 影片卡片
+4. **回覆層**：`send_response()` 直接將 Message 物件列表傳入 LINE API
+
+### 3.5 設定範例
+
+```toml
+[[databases]]
+name               = "db_youtube"
+type               = "pgvector"
+description        = "YouTube 教學影片知識庫"
+collection_name    = "kb_youtube"
+connection_uri_env = "PG_VECTOR_URI"
+top_k              = 3
+ui_type            = "VIDEO_CARD"    # 啟用影片卡片 UI
+embedding_provider       = "vertexai"
+embedding_model          = "text-embedding-004"
+embedding_project_id_env = "VERTEX_PROJECT_ID"
+embedding_location_env   = "VERTEX_LOCATION"
+embedding_dimensions     = 768
+```

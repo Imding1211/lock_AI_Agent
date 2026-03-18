@@ -151,6 +151,7 @@ embedding_dimensions     = 768                   # 向量維度
 | `embedding_project_id_env` | Vertex AI 專用，GCP 專案 ID 環境變數名 |
 | `embedding_location_env` | Vertex AI 專用，GCP 區域環境變數名 |
 | `embedding_dimensions` | 向量維度，需與 Embedding 模型輸出一致 |
+| `ui_type` | （選填）回覆 UI 類型。預設 `"TEXT"`（純文字）。可選值：`"TEXT"` / `"VIDEO_CARD"`（FlexMessage 影片卡片）。設為 `"VIDEO_CARD"` 時，retriever 會將 metadata 嵌入回傳，`post_process` 會自動產生 LINE FlexMessage 影片卡片。 |
 
 ### B. 內部 API 串接 (API Store)
 

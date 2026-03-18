@@ -9,6 +9,7 @@ from core.config import (
 )
 from profiles import ProfileManager
 from tools.transfer_human import TransferHumanTool
+from tools.line_ui_factory import build_line_messages
 from graph.state import GraphState
 from llms import get_llm
 from agents import load_prompt_template
@@ -400,11 +401,14 @@ def _strip_markdown(text: str) -> str:
 
 
 async def post_process(state: GraphState):
-    """回傳最終 answer"""
+    """回傳最終 answer + 建構 LINE Message 物件"""
     print("  [post_process] 回傳最終回覆...")
     answer = state.get("answer", "")
     answer = _strip_markdown(answer)
+    ui_hints = state.get("ui_hints", [])
+    response_ui = build_line_messages(answer, ui_hints)
     return {
         "answer": answer,
-        "history": ["post_process"]
+        "response_ui": response_ui,
+        "history": ["post_process"],
     }

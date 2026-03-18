@@ -13,6 +13,9 @@ REGISTRY = {
     "web_search": WebSearchRetriever,
 }
 
+# 工具名稱 → ui_type 對應表（由 build_tools() 填充）
+UI_TYPE_MAP: dict[str, str] = {}
+
 
 def get_retriever(db_config: dict):
     db_type = db_config.get("type")
@@ -30,7 +33,9 @@ def build_tools() -> dict[str, StructuredTool]:
         instance = get_retriever(db_config)
         tool = instance.as_langchain_tool()
         tools[tool.name] = tool
-        print(f"[*] 已註冊工具: {tool.name} — {db_config.get('description', '')}")
+        ui_type = db_config.get("ui_type", "TEXT")
+        UI_TYPE_MAP[tool.name] = ui_type
+        print(f"[*] 已註冊工具: {tool.name} — {db_config.get('description', '')} (ui_type={ui_type})")
 
     transfer = TransferHumanTool({})
     tools["transfer_to_human"] = transfer.as_langchain_tool()

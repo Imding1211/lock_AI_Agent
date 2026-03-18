@@ -1,10 +1,13 @@
 import asyncio
+import json
 import os
 from functools import partial
 from langchain_postgres import PGVector
 from .base_retriever import BaseRetriever
 
 from embeddings import get_embedding
+
+UI_METADATA_DELIMITER = "\n===UI_METADATA===\n"
 
 
 class PGVectorRetriever(BaseRetriever):
@@ -48,4 +51,17 @@ class PGVectorRetriever(BaseRetriever):
             partial(self.vector_store.similarity_search, question, k=self.top_k),
         )
         context = "\n---\n".join([doc.page_content for doc in docs])
-        return context if context else "此資料庫查無相關文件。"
+        if not context:
+            return "此資料庫查無相關文件。"
+
+        # 當 ui_type 非 TEXT 時，在尾部附加 metadata JSON
+        ui_type = self.config.get("ui_type", "TEXT")
+        if ui_type != "TEXT":
+            metadata_list = [doc.metadata for doc in docs]
+            metadata_block = json.dumps(
+                {"ui_type": ui_type, "items": metadata_list},
+                ensure_ascii=False,
+            )
+            context += UI_METADATA_DELIMITER + metadata_block
+
+        return context
