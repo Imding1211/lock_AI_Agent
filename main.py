@@ -206,17 +206,17 @@ if __name__ == "__main__":
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
 
         # --- 第 1 輪：產品問題（含個資）→ product_expert + facts 寫入 ---
-        await run_test(app, "我的 Philips Alpha 指紋怎麼設定？", thread_id=T, show_memory=True)
-
+        # await run_test(app, "Dormakaba 電子鎖的鎖舌卡住打不開門，該怎麼處理？", thread_id=T, show_memory=True)
+        
         # 驗證 facts：應寫入 device_brand=Philips, device_model=Alpha
-        await show_user_facts(T)
+        # await show_user_facts(T)
 
         # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
-        await run_test(app, "指紋辨識不靈敏，按好幾次才能開門", thread_id=T, show_memory=True)
-
+        # await run_test(app, "我想預約安裝電子鎖，要怎麼約？", thread_id="demo_ood", show_memory=True)
+        
         # --- 第 3 輪：追問 → troubleshooter（預期觸發 manage_memory:summarized）---
-        await run_test(app, "清潔過感應區了還是一樣", thread_id=T, show_memory=True)
-
+        await run_test(app, "可以給我AI-99 APP清理緩存的教學影片嗎？", thread_id="demo_YT", show_memory=True)
+        """
         # --- 第 4 輪：換話題 → product_expert（驗證摘要注入 [前情提要]）---
         await run_test(app, "電池快沒電會有什麼提示嗎？", thread_id=T, show_memory=True)
 
@@ -258,7 +258,7 @@ if __name__ == "__main__":
             "我要找真人客服，請幫我轉接真人",
             thread_id="demo_human"
         )
-
+        """
 
         # --- 持久化驗證 ---
         print("=" * 40)
