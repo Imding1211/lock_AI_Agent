@@ -49,6 +49,8 @@ async def pre_process(state: GraphState, config: RunnableConfig):
         "messages": messages,
         "user_profile": user_profile,
         "answer": "",
+        "ui_hints": [],
+        "response_ui": [],
         "history": ["pre_process"]
     }
 

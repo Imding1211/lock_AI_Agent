@@ -8,6 +8,13 @@ def _keep_last(left, right):
     return right if right is not None else left
 
 
+def _add_or_reset(left, right):
+    """Like operator.add, but empty list resets instead of no-op."""
+    if right is not None and len(right) == 0:
+        return []
+    return (left or []) + (right or [])
+
+
 class GraphState(TypedDict):
     messages: Annotated[list, add_messages]   # Agent 對話歷史（LLM + Tool messages）
     question: Annotated[str, _keep_last]      # 原始使用者輸入
@@ -16,5 +23,5 @@ class GraphState(TypedDict):
     history: Annotated[list, operator.add]      # 路徑追蹤（除錯用）
     summary: Annotated[str, _keep_last]           # 對話摘要（記憶體管理用）
     next_agents: Annotated[list, _keep_last]    # 多 agent 派發清單
-    ui_hints: Annotated[list, operator.add]       # UI metadata（平行分支匯流自動合併）
+    ui_hints: Annotated[list, _add_or_reset]       # UI metadata（平行分支匯流自動合併）
     response_ui: Annotated[list, _keep_last]      # 最終 LINE Message 物件
