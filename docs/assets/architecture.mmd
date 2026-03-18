@@ -1,13 +1,23 @@
-%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4A90D9', 'primaryTextColor': '#000', 'primaryBorderColor': '#2E6CB5', 'lineColor': '#333333', 'secondaryColor': '#E8F5E9', 'tertiaryColor': '#FFF3E0'}}}%%
-
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: '#4A90D9'
+    primaryTextColor: '#000'
+    primaryBorderColor: '#2E6CB5'
+    lineColor: '#333333'
+    secondaryColor: '#E8F5E9'
+    tertiaryColor: '#FFF3E0'
+  layout: elk
+---
 graph TD
     LINE_USER(("LINE 使用者"))
 
-    subgraph debounce_layer ["防抖層（app.py）"]
+    subgraph debounce_layer ["防抖層（app.py + core/debounce.py + core/line_bot.py）"]
         direction TB
         webhook["webhook<br/><small>接收 LINE 訊息<br/>顯示 Loading 動畫<br/>記錄 user_raw 審計日誌</small>"]
         buffer["訊息緩衝池<br/><small>累積多則訊息<br/>新訊息重設計時器<br/>buffer_wait 秒後送出</small>"]
-        langgraph_reply["langgraph_and_reply<br/><small>記錄 user + ai 審計日誌</small>"]
+        langgraph_reply["langgraph_and_reply<br/><small>記錄 user + ai 審計日誌<br/>傳遞 response_ui</small>"]
         webhook --> buffer
         buffer --> langgraph_reply
     end
@@ -18,10 +28,10 @@ graph TD
         router["router<br/><small>敏感詞攔截 → 強制轉接<br/>LLM 意圖分類<br/>直產轉接表單/拒絕語<br/>→ next_agents</small>"]
         merge_answers["merge_answers<br/><small>提取 answer<br/>多 agent 時 LLM 合併<br/>話題偵測</small>"]
         update_profile["update_profile<br/><small>LLM 萃取個資<br/>更新 user profile</small>"]
-        post_process["post_process<br/><small>Markdown 清洗<br/>記錄 chat_history<br/>回傳最終 answer</small>"]
+        post_process["post_process<br/><small>Markdown 清洗<br/>UI 工廠（ui_hints → FlexMessage）<br/>回傳 answer + response_ui</small>"]
     end
 
-    subgraph agents_layer ["Agent 子圖（Send fan-out 平行派發）"]
+    subgraph agents_layer ["Agent 子圖（Send fan-out 平行派發 + ui_hints 攔截）"]
         subgraph product_expert_sub ["product_expert"]
             direction LR
             PE_LLM["agent_llm"]
@@ -36,6 +46,14 @@ graph TD
             TS_TOOL["tool_node"]
             TS_LLM -->|tool_calls| TS_TOOL
             TS_TOOL -->|tool results| TS_LLM
+        end
+
+        subgraph youtuber_sub ["youtuber"]
+            direction LR
+            YT_LLM["agent_llm"]
+            YT_TOOL["tool_node<br/><small>攔截 UI metadata<br/>→ ui_hints</small>"]
+            YT_LLM -->|tool_calls| YT_TOOL
+            YT_TOOL -->|tool results| YT_LLM
         end
 
         subgraph order_clerk_sub ["order_clerk"]
@@ -60,6 +78,7 @@ graph TD
         prompt_router[("router.md<br/><small>意圖分類器</small>")]
         prompt_pe[("product_expert.md<br/><small>產品規格專家</small>")]
         prompt_ts[("troubleshooter.md<br/><small>故障排除專家</small>")]
+        prompt_yt[("youtuber.md<br/><small>YouTube教學影片專家</small>")]
         prompt_oc[("order_clerk.md<br/><small>訂單查詢專員</small>")]
         prompt_wr[("web_researcher.md<br/><small>網路搜尋助手</small>")]
         prompt_merge[("merge_answers.md<br/><small>多回覆合併</small>")]
@@ -68,10 +87,11 @@ graph TD
         prompt_transfer[("transfer_human_form.md<br/><small>轉接真人表單</small>")]
     end
 
-    subgraph tools_store ["Tools"]
+    subgraph tools_store ["Tools（UI_TYPE_MAP 驅動 ui_type）"]
         direction LR
-        tool_manual[("db_smartlock_manual<br/><small>智能門鎖規格、設定與保固手冊</small>")]
-        tool_trouble[("db_troubleshooting<br/><small>常見故障排除與維修指南</small>")]
+        tool_video[("db_video<br/><small>訓練影片知識庫<br/>安裝、故障排除、客服 SOP</small>")]
+        tool_line_chat[("db_line_chat<br/><small>LINE 客服對話知識庫<br/>真實客戶問答紀錄</small>")]
+        tool_youtube[("db_youtube<br/><small>YouTube 教學影片知識庫<br/>ui_type=VIDEO_CARD</small>")]
         tool_order[("db_order_api<br/><small>查詢即時訂單狀態與報修進度</small>")]
         tool_web[("db_web_search<br/><small>網際網路搜尋引擎</small>")]
         tool_transfer[("transfer_to_human<br/><small>轉接真人客服</small>")]
@@ -79,8 +99,9 @@ graph TD
 
     subgraph data_stores ["外部資料源"]
         direction LR
-        pgvec_manual[("pgvector<br/><small>產品手冊</small>")]
-        pgvec_trouble[("pgvector<br/><small>故障排除</small>")]
+        pgvec_video[("pgvector<br/><small>kb_video</small>")]
+        pgvec_line_chat[("pgvector<br/><small>kb_line_chat</small>")]
+        pgvec_youtube[("pgvector<br/><small>kb_youtube</small>")]
         order_api[("Order API<br/><small>訂單 / 維修單</small>")]
         duckduckgo[("DuckDuckGo<br/><small>網頁搜尋</small>")]
     end
@@ -95,65 +116,51 @@ graph TD
 
     LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
     EMBEDDING_ENGINE["Embedding Engine<br/><small>Vertex AI / Ollama<br/>各 [[databases]] 獨立設定</small>"]
-
-    %% LINE → Debounce → LangGraph
     LINE_USER -->|"傳送訊息"| webhook
     langgraph_reply -->|"合併訊息"| pre_process
-
-    %% Main flow
     pre_process --> manage_memory
     manage_memory --> router
-
-    %% Router conditional edges (Send() fan-out，多意圖可平行派發)
     router -->|"general_knowledge"| product_expert_sub
     router -->|"troubleshooting"| troubleshooter_sub
+    router -->|"youtube_knowledge"| youtuber_sub
     router -->|"order_status"| order_clerk_sub
     router -->|"web_search"| web_researcher_sub
     router -->|"out_of_domain / transfer_human<br/><small>Router 直接產生 answer</small>"| merge_answers
-
-    %% Agent → merge_answers
     product_expert_sub --> merge_answers
     troubleshooter_sub --> merge_answers
+    youtuber_sub --> merge_answers
     order_clerk_sub --> merge_answers
     web_researcher_sub --> merge_answers
-
-    %% Terminal edges
     merge_answers --> update_profile
     update_profile --> post_process
-    post_process -->|"answer"| langgraph_reply
-    langgraph_reply -->|"Reply / Push API"| LINE_USER
-
-    %% Prompt → node connections
+    post_process -->|"answer + response_ui"| langgraph_reply
+    langgraph_reply -->|"Reply / Push API<br/><small>TextMessage + FlexMessage</small>"| LINE_USER
     prompt_transfer --- router
     prompt_summarize --- manage_memory
     prompt_router --- router
     prompt_pe --- PE_LLM
     prompt_ts --- TS_LLM
+    prompt_yt --- YT_LLM
     prompt_oc --- OC_LLM
     prompt_wr --- WR_LLM
     prompt_merge --- merge_answers
     prompt_profile --- update_profile
-
-    %% Tool → router (transfer_human 由 router 直接呼叫)
     tool_transfer --- router
-
-    %% Tool → tool_node connections
-    tool_manual --- PE_TOOL
+    tool_video --- PE_TOOL
     tool_transfer --- PE_TOOL
-    tool_trouble --- TS_TOOL
+    tool_line_chat --- TS_TOOL
     tool_transfer --- TS_TOOL
+    tool_youtube --- YT_TOOL
+    tool_transfer --- YT_TOOL
     tool_order --- OC_TOOL
     tool_transfer --- OC_TOOL
     tool_web --- WR_TOOL
     tool_transfer --- WR_TOOL
-
-    %% Tool → Data Store connections
-    tool_manual --- pgvec_manual
-    tool_trouble --- pgvec_trouble
+    tool_video --- pgvec_video
+    tool_line_chat --- pgvec_line_chat
+    tool_youtube --- pgvec_youtube
     tool_order --- order_api
     tool_web --- duckduckgo
-
-    %% Persistence connections
     pre_process -.->|"載入"| profile_store
     pre_process -.->|"載入事實"| pg_facts
     update_profile -.->|"儲存"| profile_store
@@ -161,22 +168,18 @@ graph TD
     manage_memory -.->|"讀寫摘要"| pg_checkpointer
     webhook -.->|"user_raw"| pg_audit
     langgraph_reply -.->|"user + ai"| pg_audit
-
-    %% Embedding connections (Per-DB，各資料庫獨立設定)
-    EMBEDDING_ENGINE -..- pgvec_manual
-    EMBEDDING_ENGINE -..- pgvec_trouble
-
-    %% LLM connections
+    EMBEDDING_ENGINE -..- pgvec_video
+    EMBEDDING_ENGINE -..- pgvec_line_chat
+    EMBEDDING_ENGINE -..- pgvec_youtube
     LLM_ENGINE -..- manage_memory
     LLM_ENGINE -..- router
     LLM_ENGINE -..- PE_LLM
     LLM_ENGINE -..- TS_LLM
+    LLM_ENGINE -..- YT_LLM
     LLM_ENGINE -..- OC_LLM
     LLM_ENGINE -..- WR_LLM
     LLM_ENGINE -..- merge_answers
     LLM_ENGINE -..- update_profile
-
-    %% Styling
     classDef userNode fill:#A5D6A7,stroke:#388E3C,color:#000,stroke-width:2px
     classDef debounce fill:#FFE0B2,stroke:#F57C00,color:#000,stroke-width:1px
     classDef process fill:#BBDEFB,stroke:#1976D2,color:#000,stroke-width:1px
@@ -194,11 +197,11 @@ graph TD
     class webhook,buffer debounce
     class pre_process,manage_memory,merge_answers,update_profile,post_process process
     class router router_style
-    class PE_LLM,TS_LLM,OC_LLM,WR_LLM agent_llm
-    class PE_TOOL,TS_TOOL,OC_TOOL,WR_TOOL agent_tool
-    class pgvec_manual,pgvec_trouble,order_api,duckduckgo datastore
+    class PE_LLM,TS_LLM,YT_LLM,OC_LLM,WR_LLM agent_llm
+    class PE_TOOL,TS_TOOL,YT_TOOL,OC_TOOL,WR_TOOL agent_tool
+    class pgvec_video,pgvec_line_chat,pgvec_youtube,order_api,duckduckgo datastore
     class profile_store,pg_checkpointer,pg_audit,pg_facts persist
     class LLM_ENGINE,EMBEDDING_ENGINE llm_style
-    class prompt_router,prompt_pe,prompt_ts,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
+    class prompt_router,prompt_pe,prompt_ts,prompt_yt,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
     class langgraph_reply debounce
-    class tool_manual,tool_trouble,tool_order,tool_web,tool_transfer tool_style
+    class tool_video,tool_line_chat,tool_youtube,tool_order,tool_web,tool_transfer tool_style
