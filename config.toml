@@ -267,7 +267,7 @@ require_slots = false
 [[intents]]
 name          = "transfer_human"
 label         = "轉接真人客服"
-description   = "使用者明確且堅持要求轉接真人客服（例如直接說『轉接真人』『我要找真人客服』）。僅在使用者主動要求時觸發，不要因為問題困難或資料不足就分類為此意圖。"
+description   = "使用者明確且堅持要求轉接真人客服，或涉及任何金錢相關話題（報價、費用、預算、分期、退款、付款方式等）。"
 target        = "human"
 require_slots = false
 

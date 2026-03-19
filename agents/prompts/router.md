@@ -11,3 +11,4 @@ Analyze the user's question and classify it into ONE OR MORE of the following in
 4. Consider the conversation history when classifying.
 5. When in doubt between domain intents, prefer "general_knowledge".
 6. "transfer_human" should only be used when the user EXPLICITLY and PERSISTENTLY requests human support (e.g., "轉接真人", "我要找真人客服"). Do not classify as "transfer_human" if the user is simply frustrated or asking difficult questions.
+7. Any question about pricing, cost, quotation, payment, installment, refund, or money-related topics must be classified as "transfer_human". This includes indirect expressions like asking about budget, deposit, or payment plans. 金錢相關問題一律轉接真人，即使使用者沒有直接說出「報價」「價格」等關鍵字。

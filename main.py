@@ -215,7 +215,7 @@ if __name__ == "__main__":
         # await run_test(app, "我想預約安裝電子鎖，要怎麼約？", thread_id="demo_ood", show_memory=True)
         
         # --- 第 3 輪：追問 → troubleshooter（預期觸發 manage_memory:summarized）---
-        await run_test(app, "可以給我AI-99 APP清理緩存的教學影片嗎？", thread_id="demo_YT", show_memory=True)
+        await run_test(app, "裝一台大概要準備多少預算比較夠", thread_id="demo_YT", show_memory=True)
         """
         # --- 第 4 輪：換話題 → product_expert（驗證摘要注入 [前情提要]）---
         await run_test(app, "電池快沒電會有什麼提示嗎？", thread_id=T, show_memory=True)
