@@ -36,9 +36,13 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
     # 收集此 agent 使用的工具
     agent_tools = [tools_dict[name] for name in tool_names if name in tools_dict]
 
-    # 綁定工具到 LLM（一般模式 + 強制呼叫模式）
-    llm_with_tools = llm.bind_tools(agent_tools)
-    llm_force_tool = llm.bind_tools(agent_tools, tool_choice="any")
+    # 綁定工具到 LLM（無工具時跳過綁定）
+    if agent_tools:
+        llm_with_tools = llm.bind_tools(agent_tools)
+        llm_force_tool = llm.bind_tools(agent_tools, tool_choice="any")
+    else:
+        llm_with_tools = llm
+        llm_force_tool = llm
 
     # 建構 subgraph
     def build_subgraph():
@@ -61,12 +65,15 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
             # 將 system prompt 注入到 messages 最前面
             messages = [SystemMessage(content=system_prompt)] + list(state.get("messages", []))
 
-            # 首次呼叫強制使用工具（messages 中尚無 tool 回覆時）
-            has_tool_result = any(
-                hasattr(m, "type") and m.type == "tool"
-                for m in state.get("messages", [])
-            )
-            active_llm = llm_with_tools if has_tool_result else llm_force_tool
+            # 無工具時直接使用 LLM；有工具時首次強制使用工具
+            if not agent_tools:
+                active_llm = llm_with_tools
+            else:
+                has_tool_result = any(
+                    hasattr(m, "type") and m.type == "tool"
+                    for m in state.get("messages", [])
+                )
+                active_llm = llm_with_tools if has_tool_result else llm_force_tool
 
             response = await active_llm.ainvoke(messages)
             print(f"  [{agent_name}:agent_llm] 回應類型: {'tool_calls' if getattr(response, 'tool_calls', None) else 'text'}")

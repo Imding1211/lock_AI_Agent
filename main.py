@@ -230,7 +230,7 @@ if __name__ == "__main__":
         await run_test(app, "請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？", thread_id="demo_YT", show_memory=True)
 
         # --- Y-K1：追問解除綁定差異（同 thread 測跨回合） ---
-        await run_test(app, "解除綁定和解綁並清除數據有什麼差別？", thread_id="demo_YT", show_memory=True)
+        await run_test(app, "解綁並清除數據後會發生什麼事？", thread_id="demo_YT", show_memory=True)
 
         # ============================================================
         # C. 個別 thread：特殊流程驗證

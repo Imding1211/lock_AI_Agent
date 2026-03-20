@@ -210,6 +210,13 @@ description = "當內部資料庫不足時，負責搜尋網路資料"
 tools       = ["db_web_search", "transfer_to_human"]
 prompt_file = "agents/prompts/web_researcher.md"
 
+[[agents]]
+name        = "receptionist"
+label       = "前台接待專員"
+description = "負責一般問候、感謝、以及接收使用者更新個人資料等不需查閱知識庫的對話"
+tools       = []
+prompt_file = "agents/prompts/receptionist.md"
+
 # [[agents]]
 # name        = "product_expert"
 # label       = "產品規格專家"
@@ -256,6 +263,13 @@ name          = "web_search"
 label         = "網路搜尋"
 description   = "使用者詢問市場趨勢、產品比較、推薦等需要即時網路資訊的問題"
 target        = "web_researcher"
+require_slots = false
+
+[[intents]]
+name          = "general_reception"
+label         = "一般接待與資料更新"
+description   = "使用者提供個人資料（地址/電話）、一般問候、感謝、或與電子鎖相關但無明確專業需求的問題"
+target        = "receptionist"
 require_slots = false
 
 [[intents]]

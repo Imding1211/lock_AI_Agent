@@ -1,5 +1,5 @@
 [*] 初始化 LLM: 載入 vertexai (模型: gemini-2.5-flash)
-[清除] 已清除: PostgreSQL tables + user_facts data, data/profiles/demo_guardrail.md, data/profiles/demo.md, data/profiles/demo_YT.md, data/profiles/demo_human.md, data/profiles/demo_multi.md
+[清除] 已清除: PostgreSQL tables + user_facts data, data/profiles/demo.md, data/profiles/demo_YT.md, data/profiles/demo_human.md, data/profiles/demo_multi.md
 [Facts DB] 已連線至 PostgreSQL（user_facts）
 [*] 初始化 Embedding: 載入 Vertex AI (模型: text-embedding-004)
 [*] 初始化 PGVector: collection=kb_video...
@@ -23,6 +23,7 @@
 [*] 已建構 Agent: youtuber — youtube教學影片專家
 [*] 已建構 Agent: order_clerk — 訂單查詢專員
 [*] 已建構 Agent: web_researcher — 網路搜尋助手
+[*] 已建構 Agent: receptionist — 前台接待專員
 [*] 初始化記憶體模組: 使用 postgres 機制...
 [*] 初始化記憶體模組: 連線至 PostgreSQL
 
@@ -31,39 +32,38 @@
   [pre_process] demo 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
-  [rewrite_query] 問題無需改寫
+  [rewrite_query] 改寫: Dormakaba 鎖舌卡住怎麼處理？ → Dormakaba 鎖舌卡住 故障排除
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['troubleshooting']
   [router] 派發目標: ['troubleshooter']
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: tool_calls
   [troubleshooter:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_line_chat: 正在檢索 'Dormakaba 鎖舌卡住'...
-  [Tool 結果] db_line_chat: 回傳 838 字元
+  [Tool 呼叫] db_line_chat: 正在檢索 'Dormakaba 鎖舌卡住 故障排除'...
+  [Tool 結果] db_line_chat: 回傳 875 字元
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！關於Dorma...
+  [merge_answers] 最終回覆: 您好！關於您的 Do...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] fact 寫入: device_brand=Dormakaba
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好！關於Dormakaba電子鎖鎖舌卡住的問題，我查詢了相關資料，目前沒有直接的解決方案。
+[回覆] 您好！關於您的 Dormakaba 電子鎖鎖舌卡住的問題，我目前在資料庫中沒有找到直接的故障排除步驟。
 
-不過，我可以先提供一些常見的初步檢查步驟，或許能幫助您判斷問題：
+不過，我可以先提供一些常見的初步檢查建議，您可以試試看：
 
-1.  確認門扇是否變形或下垂：請檢查門框與門扇之間是否有摩擦或間隙不均的情況，這可能會導致鎖舌無法順暢進出。
-2.  檢查鎖舌是否有異物卡住：請仔細查看鎖舌周圍是否有灰塵、碎屑或其他異物阻礙了鎖舌的正常伸縮。
-3.  嘗試輕輕推拉門扇：在轉動把手或鑰匙的同時，輕輕推或拉門扇，看看鎖舌是否能順利收回。
-4.  檢查把手或旋鈕是否能正常操作：確認把手或內側旋鈕在沒有卡住的情況下，是否能正常轉動並帶動鎖舌。
+1.  檢查門框：請確認門框上的鎖孔是否對齊，有時候門扇下垂或門框變形會導致鎖舌無法順利伸出或縮回。
+2.  清潔鎖舌周圍：檢查鎖舌周圍是否有異物卡住，例如灰塵、碎屑或小物件，這些都可能影響鎖舌的正常運作。
+3.  輕輕推拉門扇：在嘗試開關鎖時，輕輕推拉或按壓門扇，看看是否能幫助鎖舌歸位。
 
-為了能更精確地協助您，請問您是否能提供更多細節呢？例如：
-1.  鎖舌是完全卡住無法動彈，還是可以動一點點但無法完全收回？
-2.  這個情況是突然發生的，還是之前就有一些徵兆？
-3.  門鎖是否有發出任何異常聲音？
+如果這些方法都無法解決問題，我會再嘗試用其他關鍵字搜尋看看。請問您方便提供更多關於鎖舌卡住的細節嗎？例如：
+鎖舌是完全卡住不動，還是可以動一點點但無法完全伸出或縮回？
+這個情況是突然發生的，還是之前就有一些徵兆？
+門鎖是電子鎖還是機械鎖？
 
-請您提供更多資訊，我會盡力協助您。
+這些資訊有助於我更精確地判斷問題。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -79,11 +79,11 @@
 [記憶] messages=4, summary=0字
 
 [Facts] demo:
-  device_brand    = Dormakaba                      [CURRENT] 2026-03-20 02:10:45 ~ —
+  device_brand    = Dormakaba                      [CURRENT] 2026-03-20 05:36:26 ~ —
 
 >>> [demo] Chainlock 怎麼進入設定模式？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (158 字元)
+  [pre_process] 已載入 demo 的輪廓 (400 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 4 <= 閾值 10，跳過壓縮
   [rewrite_query] 問題無需改寫
@@ -93,18 +93,28 @@
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: tool_calls
   [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_video: 正在檢索 'Chainlock 怎麼進入設定模式？'...
+  [Tool 呼叫] db_video: 正在檢索 'Chainlock 設定模式'...
   [Tool 結果] db_video: 回傳 1285 字元
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: Chainlock ...
+  [merge_answers] 最終回覆: 您好！
+
+針對 Ch...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] fact 寫入: device_brand=Chainlock
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] Chainlock AI99、A90、AI88等有觸控螢幕的電子鎖，要進入設定選單，請先點擊螢幕上的齒輪圖示。系統會要求進行管理者驗證，您可以選擇掌靜脈、人臉、密碼、卡片或指紋其中一種方式來驗證。驗證成功後，就可以進入用戶管理介面進行設定了。
+[回覆] 您好！
+
+針對 Chainlock 電子鎖如何進入設定模式，根據資料顯示：
+
+1.  對於 Chainlock AI99、A90、AI88 等具備觸控螢幕的電子鎖，請先點擊螢幕上的齒輪圖示。
+2.  系統會要求進行管理者驗證。您可以選擇使用掌靜脈、人臉、密碼、卡片或指紋這五種方式中的任一種進行驗證。
+3.  驗證成功後，即可進入用戶管理介面，進行新增或管理用戶等設定。
+
+希望這些資訊對您有幫助！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -122,7 +132,7 @@
 
 >>> [demo] 門把按下去不會彈回來是什麼問題？可以維修嗎？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (167 字元)
+  [pre_process] 已載入 demo 的輪廓 (195 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 8 <= 閾值 10，跳過壓縮
   [rewrite_query] 改寫: 門把按下去不會彈回來是什麼問題？可以維修嗎？ → Chainlock 電子鎖門把按下去不會彈回來是什麼問題？可以維修嗎？
@@ -132,30 +142,21 @@
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: tool_calls
   [troubleshooter:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_line_chat: 正在檢索 'Chainlock 電子鎖門把按下去不會彈回來'...
-  [Tool 結果] db_line_chat: 回傳 729 字元
+  [Tool 呼叫] db_line_chat: 正在檢索 'Chainlock 門把 不回彈'...
+  [Tool 結果] db_line_chat: 回傳 712 字元
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！關於Chain...
+  [merge_answers] 最終回覆: 您好！關於您的 Ch...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好！關於Chainlock電子鎖門把按下去不會彈回來的問題，我在資料庫中沒有找到直接相關的資訊。
+[回覆] 您好！關於您的 Chainlock 電子鎖門把按下去不會彈回來這個問題，根據我們的經驗，這通常表示門把內部的彈簧機構或連動裝置可能發生了故障。
 
-不過，這類問題通常可能與以下幾個原因有關：
-1.  門鎖內部機械結構卡住或損壞。
-2.  門把彈簧疲乏或斷裂。
-3.  安裝問題導致門把運作不順暢。
+這種情況確實會影響門鎖的正常開啟或關閉功能。遇到這種問題，通常是需要進行維修或更換門把的。
 
-為了能更精確地協助您，請問您方便提供您的Chainlock電子鎖型號嗎？有了型號，我或許能找到更具體的排解步驟。
-
-同時，您可以先嘗試以下基本檢查：
-1.  檢查門把周圍是否有異物卡住。
-2.  輕輕轉動門把幾次，看是否能恢復正常。
-
-如果這些方法都無法解決問題，通常會需要專業人員進行檢測和維修。
+建議您可以聯繫我們的客服，提供更詳細的狀況，以便我們評估是否需要安排專業技師到府檢查。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -173,44 +174,32 @@
 
 >>> [demo] 推拉式和把手式電子鎖差在哪？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (171 字元)
+  [pre_process] 已載入 demo 的輪廓 (295 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 已生成摘要 (181 字元)
+  [manage_memory] 已生成摘要 (355 字元)
   [manage_memory] 刪除 8 條舊訊息，保留 4 條
-  [rewrite_query] 改寫: 推拉式和把手式電子鎖差在哪？ → Chainlock推拉式電子鎖與把手式電子鎖有何差異？
+  [rewrite_query] 改寫: 推拉式和把手式電子鎖差在哪？ → 推拉式電子鎖與把手式電子鎖的差異
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['general_knowledge']
   [router] 派發目標: ['product_expert']
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: tool_calls
   [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_video: 正在檢索 'Chainlock 推拉式電子鎖 把手式電子鎖 差異'...
-  [Tool 結果] db_video: 回傳 1285 字元
+  [Tool 呼叫] db_video: 正在檢索 '推拉式電子鎖 把手式電子鎖 差異'...
+  [Tool 結果] db_video: 回傳 970 字元
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好，很抱歉，我們的...
+  [merge_answers] 最終回覆: 您好！電子鎖主要分為...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好，很抱歉，我們的資料庫中沒有直接比較Chainlock推拉式電子鎖與把手式電子鎖差異的詳細資訊。
+[回覆] 您好！電子鎖主要分為兩種基本類型：
 
-不過，我可以根據一般電子鎖的常見設計，為您說明這兩種鎖具的普遍差異：
+1.  推拉式電子鎖：解鎖後，您可以直接推或拉門來開啟。
+2.  把手式電子鎖：解鎖後，您需要下壓把手才能開啟門扇。
 
-1.  操作方式：
-    推拉式電子鎖：通常採用一體式設計，開門時只需輕推或輕拉門把即可，操作直覺且省力，尤其在手提重物時更為方便。
-    把手式電子鎖：外觀與傳統門把相似，開門時需要下壓或轉動把手。
-
-2.  外觀設計：
-    推拉式電子鎖：設計通常較為現代簡潔，線條流暢，整體感較強。
-    把手式電子鎖：外觀選擇多樣，從傳統到現代風格都有，能更好地融入不同裝潢風格。
-
-3.  安裝要求：
-    推拉式電子鎖：由於其特殊的開門機制，對門體和安裝空間可能有特定的要求。
-    把手式電子鎖：安裝方式與傳統門鎖較為接近，適用性較廣。
-
-如果您能提供具體的Chainlock電子鎖型號，我可以嘗試為您查詢更精確的產品規格資訊。
+簡單來說，主要差異在於開門的方式。
 [路徑]
 ├── pre_process
 ├── manage_memory → summarized
@@ -223,8 +212,10 @@
 ├── merge_answers
 ├── update_profile
 └── post_process
-[記憶] messages=8, summary=181字
-[摘要] 使用者反映Dormakaba電...
+[記憶] messages=8, summary=355字
+[摘要] 目前對話摘要如下：
+
+1.  ...
 
 
 >>> [demo_YT] 請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？
@@ -232,30 +223,48 @@
   [pre_process] demo_YT 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
-  [rewrite_query] 問題無需改寫
+  [rewrite_query] 改寫: 請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？ → Chatlock AI-99 App 如何新增家人開門權限？
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['general_knowledge']
   [router] 派發目標: ['product_expert']
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: tool_calls
   [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 App 加入家人'...
-  [Tool 結果] db_video: 回傳 1206 字元
+  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 新增家人開門權限'...
+  [Tool 結果] db_video: 回傳 1234 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'AI-99 App 成員管理'...
+  [Tool 結果] db_video: 回傳 1133 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 用戶管理'...
+  [Tool 結果] db_video: 回傳 1234 字元
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好，關於如何在 C...
+  [merge_answers] 最終回覆: 您好！
+
+根據我們的...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] fact 寫入: device_model=AI-99
   [update_profile] fact 寫入: device_brand=Chatlock
   [update_profile] 已更新 demo_YT 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好，關於如何在 Chatlock AI-99 App 中加入家人讓他們也能開門，我目前在資料庫中沒有找到直接的教學影片或步驟說明。
+[回覆] 您好！
 
-不過，通常這類型的智慧門鎖應用程式，都會在 App 裡面提供「使用者管理」、「成員設定」或「家庭成員」等相關選項。您可以嘗試在 Chatlock AI-99 App 中尋找這些功能，通常可以在設定（Settings）或個人檔案（Profile）的區塊找到。
+根據我們的知識庫資料，Chatlock AI-99 電子鎖新增或管理用戶（包含家人開門權限）的步驟，主要是透過電子鎖本身的觸控螢幕進行設定。
 
-如果您在 App 中找不到相關設定，或是需要更詳細的步驟，建議您可以提供更多 App 介面的資訊，或者我也可以嘗試用其他關鍵字再幫您找找看。
+1.  首先，請點擊電子鎖螢幕上的齒輪圖示，進入設定選單。
+2.  系統會要求您進行管理者驗證，您可以選擇使用掌靜脈、人臉、密碼、卡片或指紋其中一種方式進行驗證。
+3.  驗證成功後，即可進入「用戶管理介面」，在這裡您可以新增或管理用戶。
+
+目前在我們的知識庫中，沒有找到關於透過手機 App 直接新增家人開門權限的具體步驟。
+
+請問您是否需要了解如何在電子鎖上進行用戶管理呢？
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -264,50 +273,8 @@
 ├── product_expert
 │   ├── agent_llm
 │   ├── tool_node
-│   └── agent_llm
-├── merge_answers
-├── update_profile
-└── post_process
-[記憶] messages=4, summary=0字
-
-
->>> [demo_YT] 解除綁定和解綁並清除數據有什麼差別？
-  [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo_YT 的輪廓 (280 字元)
-  [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 4 <= 閾值 10，跳過壓縮
-  [rewrite_query] 改寫: 解除綁定和解綁並清除數據有什麼差別？ → Chatlock AI-99 App中，解除綁定與解除綁定並清除數據的區別是什麼？
-  [router] 正在分類意圖...
-  [router] 意圖分類結果: ['general_knowledge']
-  [router] 派發目標: ['product_expert']
-  [product_expert:agent_llm] LLM 正在思考...
-  [product_expert:agent_llm] 回應類型: tool_calls
-  [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 App 解除綁定 解除綁定並清除數據 區別'...
-  [Tool 結果] db_video: 回傳 1307 字元
-  [product_expert:agent_llm] LLM 正在思考...
-  [product_expert:agent_llm] 回應類型: text
-  [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！關於Chatl...
-  [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo_YT 的軟輪廓
-  [post_process] 回傳最終回覆...
-  [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好！關於Chatlock AI-99 App 中「解除綁定」與「解除綁定並清除數據」的區別，我在資料庫中沒有找到直接的說明。
-
-不過，一般來說：
-
-1.  解除綁定：通常是指將您的裝置（例如電子鎖）從您的App帳戶中移除連結。這表示您的App將不再能控制或接收該裝置的資訊，但裝置本身可能還會保留一些設定或數據。
-
-2.  解除綁定並清除數據：這通常不僅會將裝置從您的App帳戶中移除，還會嘗試清除裝置上與App相關的所有數據和設定，將其恢復到更接近出廠預設的狀態。這可能包括用戶資料、密碼、指紋等。
-
-由於不同App的設計可能有所差異，建議您可以查閱Chatlock AI-99 App的用戶手冊，或直接聯繫Chatlock的客服，以獲得最精確的資訊。
-[路徑]
-├── pre_process
-├── manage_memory → skip
-├── rewrite_query
-├── router → product_expert
-├── product_expert
+│   ├── agent_llm
+│   ├── tool_node
 │   ├── agent_llm
 │   ├── tool_node
 │   └── agent_llm
@@ -315,6 +282,47 @@
 ├── update_profile
 └── post_process
 [記憶] messages=8, summary=0字
+
+
+>>> [demo_YT] 解綁並清除數據後會發生什麼事？
+  [pre_process] 正在準備輸入...
+  [pre_process] 已載入 demo_YT 的輪廓 (378 字元)
+  [manage_memory] 檢查是否需要壓縮記憶...
+  [manage_memory] 訊息數 8 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 解綁並清除數據後會發生什麼事？ → Chatlock AI-99 解綁並清除數據後會發生什麼事？
+  [router] 正在分類意圖...
+  [router] 意圖分類結果: ['general_knowledge']
+  [router] 派發目標: ['product_expert']
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 解綁清除數據'...
+  [Tool 結果] db_video: 回傳 1234 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: text
+  [merge_answers] 正在提取並合併回覆...
+  [merge_answers] 最終回覆: Chatlock A...
+  [update_profile] 正在更新使用者輪廓...
+  [post_process] 回傳最終回覆...
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] Chatlock AI-99 解綁並清除數據後會發生什麼事？我目前在資料庫中沒有找到直接關於「解綁並清除數據」的具體說明。
+
+不過，我可以提供您一些相關的資訊，例如如何進入設定模式、新增使用者等。
+
+請問您是否想了解如何將電子鎖恢復到原廠設定，或是清除所有使用者資料呢？這樣我會再嘗試用不同的關鍵字為您查詢。
+[路徑]
+├── pre_process
+├── manage_memory → skip
+├── rewrite_query
+├── router → product_expert
+├── product_expert
+│   ├── agent_llm
+│   ├── tool_node
+│   └── agent_llm
+├── merge_answers
+├── update_profile
+└── post_process
+[記憶] messages=12, summary=0字
 
 
 >>> [demo_ood] 今天台北天氣如何？
@@ -331,9 +339,9 @@
   [update_profile] 正在更新使用者輪廓...
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好，很抱歉，我這裡主要負責電子鎖與智慧門鎖的產品、安裝、故障排除及售後服務。天氣資訊不在我的服務範圍內喔。
+[回覆] 您好，很抱歉，我這裡主要負責電子鎖、智慧門鎖的產品諮詢、安裝、故障排除與售後服務，關於天氣資訊我無法提供協助喔。
 
-如果您有任何關於電子鎖的問題，都歡迎隨時提出，我很樂意為您服務！
+請問您有任何電子鎖相關的問題，例如產品功能、安裝預約、使用問題或售後服務，需要我為您服務的嗎？我很樂意為您解答！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -349,7 +357,7 @@
   [pre_process] demo_multi 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
-  [rewrite_query] 改寫: 幫我查訂單 ORD-20260301 的進度，另外 FAMMIX SAFER-2 電子鎖有哪些解鎖功能？ → 查詢訂單 ORD-20260301 進度與 FAMMIX SAFER-2 電子鎖解鎖功能
+  [rewrite_query] 改寫: 幫我查訂單 ORD-20260301 的進度，另外 FAMMIX SAFER-2 電子鎖有哪些解鎖功能？ → 查詢訂單 ORD-20260301 進度 及 FAMMIX SAFER-2 電子鎖解鎖功能
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['order_status', 'general_knowledge']
   [router] 派發目標: ['order_clerk', 'product_expert']
@@ -357,7 +365,7 @@
   [product_expert:agent_llm] LLM 正在思考...
   [order_clerk:agent_llm] 回應類型: tool_calls
   [order_clerk:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_order_api: 正在檢索 '查詢訂單 ORD-20260301 進度與 FAMMIX SAFER-2 電子鎖解鎖功能'...
+  [Tool 呼叫] db_order_api: 正在檢索 '查詢訂單 ORD-20260301 進度'...
   [Tool 結果] db_order_api: 回傳 42 字元
   [order_clerk:agent_llm] LLM 正在思考...
   [order_clerk:agent_llm] 回應類型: text
@@ -369,23 +377,26 @@
   [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
   [merge_answers] 合併 2 段 agent 回覆...
-  [merge_answers] 最終回覆: 您好，很抱歉，目前系...
+  [merge_answers] 最終回覆: 您好！
+
+關於您的查...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] fact 寫入: device_model=SAFER-2
   [update_profile] fact 寫入: device_brand=FAMMIX
   [update_profile] 已更新 demo_multi 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好，很抱歉，目前系統無法查詢訂單進度，請您稍後再試。
+[回覆] 您好！
 
-關於FAMMIX SAFER-2 電子鎖的解鎖功能，為了能更精確地協助您，請問您是想了解哪方面的資訊呢？例如：
+關於您的查詢，我們將分兩部分說明：
 
-1.  如何設定解鎖方式（指紋、密碼、卡片等）？
-2.  解鎖時遇到什麼問題？
-3.  想了解特定解鎖方式（如指紋、密碼、卡片）的操作步驟？
-4.  或是其他特定的問題？
+1.  訂單 ORD-20260301 的進度：
+    很抱歉，目前系統連線發生錯誤，暫時無法取得訂單資料。由於我的職責範圍主要在電子鎖的產品規格、安裝、故障排除與售後服務，無法直接查詢訂單狀態。建議您可以透過原購買管道查詢訂單進度。
 
-如果您能提供更多細節，或是電子鎖的使用手冊，我會盡力協助您。
+2.  FAMMIX SAFER-2 電子鎖的解鎖功能：
+    由於我們無法直接查詢特定產品的詳細規格或操作方式，且在知識庫中沒有找到直接相關的詳細操作步驟。請問您是想了解這款鎖的哪方面功能，或者在使用上遇到了什麼問題呢？例如：指紋解鎖、密碼解鎖、卡片解鎖，或是透過App解鎖？如果您能提供更具體的資訊，我們將盡力為您查找相關說明或提供常見的故障排除建議。
+
+期待您的回覆，謝謝！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
@@ -441,15 +452,15 @@
 └── post_process
 
 [Facts] demo_human:
-  address         = 台北市信義區松仁路 100 號 12 樓           [CURRENT] 2026-03-20 02:13:20 ~ —
-  phone           = 0912-345-678                   [CURRENT] 2026-03-20 02:13:13 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [CURRENT] 2026-03-20 05:39:30 ~ —
+  phone           = 0912-345-678                   [CURRENT] 2026-03-20 05:39:19 ~ —
 
 >>> [demo_guardrail] 有網路功能的電子鎖大概多少錢？可以報價嗎？
   [pre_process] 正在準備輸入...
   [pre_process] demo_guardrail 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
-  [rewrite_query] 改寫: 有網路功能的電子鎖大概多少錢？可以報價嗎？ → 有網路功能的電子鎖價格報價
+  [rewrite_query] 改寫: 有網路功能的電子鎖大概多少錢？可以報價嗎？ → 網路功能電子鎖價格與報價查詢
   [router] 正在分類意圖...
   [Guardrail] 偵測到敏感詞彙「報價」，強制轉接真人
   [Tool 呼叫] transfer_to_human: user_id=demo_guardrail
@@ -457,7 +468,6 @@
   [merge_answers] 最終回覆: 您好
 麻煩您留下以下...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] 已更新 demo_guardrail 的軟輪廓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
 [回覆] 您好
@@ -480,38 +490,30 @@
 
 >>> [demo_human] 我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo_human 的輪廓 (290 字元)
+  [pre_process] 已載入 demo_human 的輪廓 (170 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
   [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
-  [rewrite_query] 改寫: 我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓 → 客戶地址更新：由 台北市信義區松仁路 100 號 12 樓 變更為 新北市板橋區文化路一段 200 號 5 樓
+  [rewrite_query] 改寫: 我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓 → 客戶搬家，新地址為新北市板橋區文化路一段 200 號 5 樓
   [router] 正在分類意圖...
-  [router] 意圖分類結果: ['order_status']
-  [router] 派發目標: ['order_clerk']
-  [order_clerk:agent_llm] LLM 正在思考...
-  [order_clerk:agent_llm] 回應類型: tool_calls
-  [order_clerk:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] transfer_to_human: user_id=0912-345-678
-  [order_clerk:agent_llm] LLM 正在思考...
-  [order_clerk:agent_llm] 回應類型: text
+  [router] 意圖分類結果: ['general_reception']
+  [router] 派發目標: ['receptionist']
+  [receptionist:agent_llm] LLM 正在思考...
+  [receptionist:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好，關於您的地址更...
+  [merge_answers] 最終回覆: 好的，感謝您提供新地...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] fact 寫入: address=新北市板橋區文化路一段 200 號 5 樓
   [post_process] 回傳最終回覆...
   [UI Factory] 回覆類型: TEXT（純文字）
-[回覆] 您好，關於您的地址更新需求，由於我目前無法直接為您修改系統中的客戶資料，我已經為您轉接給真人客服專員處理。
+[回覆] 好的，感謝您提供新地址！
 
-真人客服專員會與您聯繫，並協助您更新地址資訊。
-
-謝謝您的配合！
+已經為您記錄，您的新地址是新北市板橋區文化路一段 200 號 5 樓，對嗎？
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
 ├── rewrite_query
-├── router → order_clerk
-├── order_clerk
-│   ├── agent_llm
-│   ├── tool_node
+├── router → receptionist
+├── receptionist
 │   └── agent_llm
 ├── merge_answers
 ├── [FLAG] topic_resolved
@@ -519,16 +521,16 @@
 └── post_process
 
 [Facts] demo_human:
-  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-20 02:13:20 ~ —
-  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-20 02:13:20 ~ 2026-03-20 02:13:20
-  phone           = 0912-345-678                   [CURRENT] 2026-03-20 02:13:13 ~ —
+  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-20 05:39:30 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-20 05:39:30 ~ 2026-03-20 05:39:30
+  phone           = 0912-345-678                   [CURRENT] 2026-03-20 05:39:19 ~ —
 
 >>> [demo_human] 我要找真人客服，請幫我轉接真人
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo_human 的輪廓 (291 字元)
+  [pre_process] 已載入 demo_human 的輪廓 (171 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 5 <= 閾值 10，跳過壓縮
-  [rewrite_query] 改寫: 我要找真人客服，請幫我轉接真人 → 電子鎖/智慧門鎖服務或故障排除真人客服轉接需求
+  [manage_memory] 訊息數 3 <= 閾值 10，跳過壓縮
+  [rewrite_query] 問題無需改寫
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['transfer_human']
   [router] 直接處理 transfer_human...
@@ -558,25 +560,32 @@
 └── post_process
 
 ========================================
-[最終] thread=demo, messages=8, summary=181字
-[摘要] 使用者反映Dormakaba電子鎖鎖舌卡住，客服提供了初步檢查步驟（檢查門扇變形、異物、輕推拉門扇、把手操作），並詢問鎖舌卡住程度、發生時間及是否有異音，此問題仍在進行中。
+[最終] thread=demo, messages=8, summary=355字
+[摘要] 目前對話摘要如下：
 
-使用者另詢問Chainlock AI99、A90、AI88等觸控螢幕電子鎖如何進入設定模式。客服說明需點擊螢幕齒輪圖示，並透過掌靜脈、人臉、密碼、卡片或指紋進行管理者驗證，此問題已解決。
+1.  **Dormakaba 電子鎖鎖舌卡住 (進行中)**
+    *   **問題描述：** 使用者回報 Dormakaba 電子鎖鎖舌卡住。
+    *   **客服建議：** 檢查門框對齊、清潔鎖舌周圍異物、輕推拉門扇。
+    *   **待確認資訊：** 鎖舌卡住程度、發生情況、鎖具類型（電子/機械）。
+
+2.  **Chainlock 電子鎖進入設定模式 (已解決)**
+    *   **問題描述：** 使用者詢問 Chainlock 電子鎖如何進入設定模式。
+    *   **解決方案：** 針對 Chainlock AI99、A90、AI88 等觸控螢幕型號，點擊螢幕齒輪圖示，透過掌靜脈、人臉、密碼、卡片或指紋任一方式進行管理者驗證後即可進入用戶管理介面。
 
 ========================================
 [Facts 總覽]
 [Facts] demo:
-  device_brand    = Chainlock                      [CURRENT] 2026-03-20 02:11:04 ~ —
-  device_brand    = Dormakaba                      [EXPIRED] 2026-03-20 02:10:45 ~ 2026-03-20 02:11:04
+  device_brand    = Chainlock                      [CURRENT] 2026-03-20 05:36:51 ~ —
+  device_brand    = Dormakaba                      [EXPIRED] 2026-03-20 05:36:26 ~ 2026-03-20 05:36:51
 [Facts] demo_YT:
-  device_brand    = Chatlock                       [CURRENT] 2026-03-20 02:12:17 ~ —
-  device_model    = AI-99                          [CURRENT] 2026-03-20 02:11:20 ~ —
+  device_brand    = Chatlock                       [CURRENT] 2026-03-20 05:38:19 ~ —
+  device_model    = AI-99                          [CURRENT] 2026-03-20 05:37:05 ~ —
 [Facts] demo_human:
-  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-20 02:13:20 ~ —
-  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-20 02:13:20 ~ 2026-03-20 02:13:20
-  phone           = 0912-345-678                   [CURRENT] 2026-03-20 02:13:13 ~ —
+  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-20 05:39:30 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-20 05:39:30 ~ 2026-03-20 05:39:30
+  phone           = 0912-345-678                   [CURRENT] 2026-03-20 05:39:19 ~ —
 [Facts] demo_ood: (無記錄)
 [Facts] demo_multi:
-  device_brand    = FAMMIX                         [CURRENT] 2026-03-20 02:13:12 ~ —
-  device_model    = SAFER-2                        [CURRENT] 2026-03-20 02:12:18 ~ —
+  device_brand    = FAMMIX                         [CURRENT] 2026-03-20 05:39:19 ~ —
+  device_model    = SAFER-2                        [CURRENT] 2026-03-20 05:38:20 ~ —
 [Facts] demo_guardrail: (無記錄)
