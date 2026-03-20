@@ -15,6 +15,7 @@
 *   `web_researcher.md`: **網路搜尋助手**。
 *   `summarize_messages.md`: **記憶壓縮器**。負責將對話精煉為摘要。
 *   `merge_answers.md`: **回覆合併器**。當多個意圖同時觸發時，負責將多段回答融合成一段自然文字。
+*   `rewrite_query.md`: **問題改寫專家**。負責在 Router 之前，解析代名詞、融合使用者輪廓與前情提要，為後續 Agent 提供精確的檢索句。
 *   `update_profile.md`: **輪廓觀察員**。負責從對話中學習使用者的背景。
 
 ---
@@ -30,6 +31,15 @@
 | `{slots_section}` | 必填資訊填補指示 | `config.toml [required_slots]` |
 | `{intent_list}` | 可選意圖清單 | `config.toml [[intents]]` |
 | `{existing_summary}`| 現有的對話摘要 | `state["summary"]` |
+
+### 2.5 rewrite_query 專用模板變數
+
+| 變數 | 說明 | 注入來源 |
+|------|------|---------|
+| `{question}` | 使用者原始問題 | `state["question"]` |
+| `{summary}` | 前情提要 | `state["summary"]` |
+| `{user_profile}` | 使用者輪廓 | `state["user_profile"]` |
+| `{domain}` | 業務範疇描述 | `config.toml [system].domain` |
 
 ---
 
@@ -67,3 +77,21 @@ LINE 平台不支援 Markdown 渲染，因此所有面向使用者的 Agent Prom
 *   **語氣**：專業、親切、簡潔。
 *   **禁忌**：嚴禁提及「我只是一個 AI」、「我的知識庫更新於...」。一律以「電子鎖專屬客服」的身分自居。
 *   **安全邊界**：涉及門鎖受損或安全隱患時，語氣需變得嚴肅並立即主動引導轉接真人客服。
+
+---
+
+## 5. 問題重寫專家 (Rewrite Query)
+
+`rewrite_query` 是位於 `manage_memory` 與 `router` 之間的獨立節點，其職責為：
+
+1. **代名詞解析**：將「它」、「那個」等代名詞替換為具體品牌/型號
+2. **脈絡補齊**：結合使用者輪廓（{user_profile}）與前情提要（{summary}），將過於簡短的問題補齊為完整檢索句
+3. **原意保持**：只改寫問題，不回答問題
+
+### 對 Agent Prompt 調整的影響
+
+由於 `rewrite_query` 已在 Router 之前完成脈絡補齊，Agent 收到的 `question` 已是精確的檢索句。因此：
+
+- Agent Prompt **不再需要**強求 Agent 自己推敲「它是什麼」、「上下文是什麼」
+- Agent 可以專注於工具檢索與回答，不需處理代名詞解析
+- 這簡化了 Agent Prompt 的複雜度，也提升了檢索準確率

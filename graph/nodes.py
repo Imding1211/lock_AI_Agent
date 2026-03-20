@@ -42,9 +42,6 @@ async def pre_process(state: GraphState, config: RunnableConfig):
     if summary:
         messages.append(SystemMessage(content=f"[前情提要]\n{summary}"))
 
-    # 加入當前問題
-    messages.append(HumanMessage(content=state["question"]))
-
     return {
         "messages": messages,
         "user_profile": user_profile,
@@ -118,6 +115,43 @@ async def manage_memory(state: GraphState, config: RunnableConfig):
         "summary": new_summary,
         "messages": remove_messages,
         "history": ["manage_memory:summarized"],
+    }
+
+
+async def rewrite_query(state: GraphState, config: RunnableConfig):
+    """用 LLM 將口語化問題改寫為精準檢索句"""
+    original = state.get("question", "")
+    user_profile = state.get("user_profile", "")
+    summary = state.get("summary", "")
+    domain = SYSTEM_CONFIG.get("domain", "電子鎖")
+
+    # 載入 prompt 並呼叫 LLM
+    prompt = load_prompt_template(
+        PROMPTS_CONFIG.get("rewriter", "agents/prompts/rewrite_query.md"),
+        domain=domain,
+        user_profile=user_profile or "(無使用者輪廓)",
+        summary=summary or "(無前情提要)",
+        question=original,
+    )
+
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        rewritten = response.content.strip()
+        if not rewritten:
+            rewritten = original
+    except Exception as e:
+        print(f"  [rewrite_query] 改寫失敗，使用原始問題: {e}")
+        rewritten = original
+
+    if rewritten != original:
+        print(f"  [rewrite_query] 改寫: {original} → {rewritten}")
+    else:
+        print(f"  [rewrite_query] 問題無需改寫")
+
+    return {
+        "question": rewritten,
+        "messages": [HumanMessage(content=rewritten)],
+        "history": ["rewrite_query"],
     }
 
 

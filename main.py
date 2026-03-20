@@ -205,27 +205,43 @@ if __name__ == "__main__":
         app = await build_graph()
         T = "demo"  # 共用 thread，測試跨回合記憶 + 摘要壓縮
 
-        # --- 第 1 輪：產品問題（含個資）→ product_expert + facts 寫入 ---
-        # await run_test(app, "Dormakaba 電子鎖的鎖舌卡住打不開門，該怎麼處理？", thread_id=T, show_memory=True)
-        
-        # 驗證 facts：應寫入 device_brand=Philips, device_model=Alpha
-        # await show_user_facts(T)
+        # ============================================================
+        # A. 共用 thread "demo"：跨回合記憶 + 摘要壓縮
+        # ============================================================
 
-        # --- 第 2 輪：故障排除 → troubleshooter（累積 messages）---
-        # await run_test(app, "我想預約安裝電子鎖，要怎麼約？", thread_id="demo_ood", show_memory=True)
-        
-        # --- 第 3 輪：追問 → troubleshooter（預期觸發 manage_memory:summarized）---
-        await run_test(app, "裝一台大概要準備多少預算比較夠", thread_id="demo_YT", show_memory=True)
-        """
-        # --- 第 4 輪：換話題 → product_expert（驗證摘要注入 [前情提要]）---
-        await run_test(app, "電池快沒電會有什麼提示嗎？", thread_id=T, show_memory=True)
+        # --- 第 1 輪：db_video / troubleshoot (V-T1) → facts 寫入 device_brand ---
+        await run_test(app, "Dormakaba 鎖舌卡住怎麼處理？", thread_id=T, show_memory=True)
+        await show_user_facts(T)
+
+        # --- 第 2 輪：db_video / setup (V-S1) → 累積 messages ---
+        await run_test(app, "Chainlock 怎麼進入設定模式？", thread_id=T, show_memory=True)
+
+        # --- 第 3 輪：db_line_chat / troubleshoot (L-T2) → 預期觸發 manage_memory:summarized ---
+        await run_test(app, "門把按下去不會彈回來是什麼問題？可以維修嗎？", thread_id=T, show_memory=True)
+
+        # --- 第 4 輪：db_video / knowledge (V-K3) → 換話題，驗證摘要注入 [前情提要] ---
+        await run_test(app, "推拉式和把手式電子鎖差在哪？", thread_id=T, show_memory=True)
+
+        # ============================================================
+        # B. db_youtube 專用 thread：驗證 HyDE + Small-to-Big + 時間戳
+        # ============================================================
+
+        # --- Y-S3：家庭成員邀請設定 ---
+        await run_test(app, "請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？", thread_id="demo_YT", show_memory=True)
+
+        # --- Y-K1：追問解除綁定差異（同 thread 測跨回合） ---
+        await run_test(app, "解除綁定和解綁並清除數據有什麼差別？", thread_id="demo_YT", show_memory=True)
+
+        # ============================================================
+        # C. 個別 thread：特殊流程驗證
+        # ============================================================
 
         # --- 領域外問題 → out_of_domain ---
         await run_test(app, "今天台北天氣如何？", thread_id="demo_ood")
 
-        # --- 多意圖平行派發 → order_clerk + web_researcher ---
+        # --- 多意圖平行派發 → order_clerk + product_expert ---
         await run_test(app,
-            "幫我查訂單 ORD-20260301 的進度，另外有推薦支援 HomeKey 的電子鎖嗎？",
+            "幫我查訂單 ORD-20260301 的進度，另外 FAMMIX SAFER-2 電子鎖有哪些解鎖功能？",
             thread_id="demo_multi"
         )
 
@@ -234,13 +250,12 @@ if __name__ == "__main__":
             "我住台北市信義區松仁路 100 號 12 樓，電話 0912-345-678，幫我轉接真人客服",
             thread_id="demo_human"
         )
-
-        # 驗證 facts：應寫入 phone, address
         await show_user_facts("demo_human")
 
         # --- 敏感詞護欄 → guardrail_triggered（跳過 LLM，強制轉接真人）---
+        # 改用 L-K1 風格的價格詢問，測試金錢意圖攔截
         await run_test(app,
-            "這款電子鎖多少錢？可以報價嗎？",
+            "有網路功能的電子鎖大概多少錢？可以報價嗎？",
             thread_id="demo_guardrail"
         )
 
@@ -249,8 +264,6 @@ if __name__ == "__main__":
             "我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓",
             thread_id="demo_human"
         )
-
-        # 驗證 SCD：舊地址 EXPIRED + 新地址 CURRENT
         await show_user_facts("demo_human")
 
         # --- 轉接真人（驗證 SQL facts 優先填入表單）---
@@ -258,7 +271,6 @@ if __name__ == "__main__":
             "我要找真人客服，請幫我轉接真人",
             thread_id="demo_human"
         )
-        """
 
         # --- 持久化驗證 ---
         print("=" * 40)
@@ -278,7 +290,7 @@ if __name__ == "__main__":
         # 顯示所有測試使用者的 facts
         print("\n" + "=" * 40)
         print("[Facts 總覽]")
-        for uid in (T, "demo_human", "demo_ood", "demo_multi", "demo_guardrail"):
+        for uid in (T, "demo_YT", "demo_human", "demo_ood", "demo_multi", "demo_guardrail"):
             await show_user_facts(uid)
 
         await asyncio.sleep(0.5)

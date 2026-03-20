@@ -121,6 +121,8 @@ location_env = "VERTEX_LOCATION"      # GCP 區域 (例: us-central1)
 
 ### A. 向量資料庫 (pgvector)
 
+> **重要**：Embedding 設定為 per-database 配置，每個向量資料庫獨立設定自己的 `embedding_provider`、`embedding_model` 等參數，系統不存在全域 Embedding 設定。
+
 每個向量資料庫獨立配置 Embedding 參數（`embedding_provider`、`embedding_model` 等），透過 Embeddings Factory（`embeddings/__init__.py`）動態載入，將文字轉為向量進行語意搜尋。
 
 ```toml
@@ -380,6 +382,7 @@ summarizer      = "agents/prompts/summarize_messages.md"
 merger          = "agents/prompts/merge_answers.md"
 profile_updater = "agents/prompts/update_profile.md"
 transfer_form   = "agents/prompts/transfer_human_form.md"
+rewriter        = "agents/prompts/rewrite_query.md"
 ```
 
 | 參數 | 說明 |
@@ -389,6 +392,7 @@ transfer_form   = "agents/prompts/transfer_human_form.md"
 | `merger` | 多 Agent 回覆合併 prompt 路徑 |
 | `profile_updater` | 使用者輪廓萃取 prompt 路徑 |
 | `transfer_form` | 轉接真人表單模板路徑 |
+| `rewriter` | 問題改寫（rewrite_query）prompt 路徑 |
 
 > Agent 各自的 prompt 路徑定義在 `[[agents]].prompt_file` 中，不在此表。
 
@@ -399,7 +403,7 @@ transfer_form   = "agents/prompts/transfer_human_form.md"
 | 設定區塊 | 對應流程節點 / 模組 |
 |---------|-------------------|
 | `[system]` | Router prompt、out_of_domain 判斷 |
-| `[debounce]` | `app.py` 防抖層 |
+| `[debounce]` | `core/debounce.py` 防抖層 |
 | `[line_bot]` | `app.py` Loading 動畫 |
 | `[templates]` | `app.py` 錯誤回覆範本 + Push API fallback |
 | `[llm]` | 所有 LLM 呼叫（Router、Agent、manage_memory、merge_answers、update_profile） |
@@ -411,4 +415,5 @@ transfer_form   = "agents/prompts/transfer_human_form.md"
 | `[user_profile]` | `profiles/manager.py` → pre_process / update_profile + PostgreSQL `user_facts` |
 | `[user_profile.extraction]` | `core/constants.py` → 電話/地址 regex 動態載入 |
 | `[storage]` | `storage/__init__.py` → 審計日誌持久化 |
+| `[prompts].rewriter` | `graph/nodes.py` rewrite_query 節點 — 問題改寫 |
 | `[prompts]` | `graph/nodes.py`、`tools/__init__.py` → prompt 路徑集中管理 |

@@ -148,7 +148,9 @@ prompt_file = "agents/prompts/product_expert.md"
 | `source` | 影片完整 URL（YouTube） | `https://www.youtube.com/watch?v=xxxx` |
 | `title` | 影片標題 | `電子鎖安裝教學 - 基本步驟` |
 
-系統會自動從 `source` URL 提取 YouTube video_id 並組合縮圖網址。若 metadata 缺少 `source` 或 URL 格式不正確，該筆文件會被自動跳過（降級為純文字回覆）。
+系統會自動從 `source` URL 提取 YouTube video_id 並組合縮圖網址。
+
+> **注意**：若 metadata 缺少必要欄位或格式不正確，系統會自動降級為純文字回覆（Fallback to TEXT）。開發者在使用 `seed_db.py` 匯入資料時，應確保每筆文件的 metadata 嚴格包含上述欄位。
 
 ### 3.4 運作機制
 

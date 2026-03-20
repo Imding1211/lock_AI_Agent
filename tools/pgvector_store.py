@@ -46,9 +46,16 @@ class PGVectorRetriever(BaseRetriever):
 
     async def aretrieve(self, question: str) -> str:
         loop = asyncio.get_event_loop()
+        # 採用 MMR (Maximal Marginal Relevance) 演算法，提升檢索結果的多樣性
+        # fetch_k = k * 3 是經驗值，表示先撈出 3 倍數量的候選人，再從中挑選 k 個最多樣化的
         docs = await loop.run_in_executor(
             None,
-            partial(self.vector_store.similarity_search, question, k=self.top_k),
+            partial(
+                self.vector_store.max_marginal_relevance_search,
+                question,
+                k=self.top_k,
+                fetch_k=self.top_k * 3
+            ),
         )
         context = "\n---\n".join([doc.page_content for doc in docs])
         if not context:

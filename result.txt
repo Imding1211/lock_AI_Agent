@@ -1,65 +1,75 @@
 [*] 初始化 LLM: 載入 vertexai (模型: gemini-2.5-flash)
-[清除] 已清除: PostgreSQL tables + user_facts data, data/profiles/demo.md, data/profiles/demo_human.md, data/profiles/demo_multi.md
+[清除] 已清除: PostgreSQL tables + user_facts data, data/profiles/demo_guardrail.md, data/profiles/demo.md, data/profiles/demo_YT.md, data/profiles/demo_human.md, data/profiles/demo_multi.md
 [Facts DB] 已連線至 PostgreSQL（user_facts）
 [*] 初始化 Embedding: 載入 Vertex AI (模型: text-embedding-004)
-[*] 初始化 PGVector: collection=smartlock_manual...
+[*] 初始化 PGVector: collection=kb_video...
 [*] 維度驗證通過: 768
-[*] 已註冊工具: db_smartlock_manual — 智能門鎖規格、設定與保固手冊
+[*] 已註冊工具: db_video — 訓練影片知識庫：安裝、故障排除、客服 SOP (ui_type=TEXT)
 [*] 初始化 Embedding: 載入 Vertex AI (模型: text-embedding-004)
-[*] 初始化 PGVector: collection=troubleshooting...
+[*] 初始化 PGVector: collection=kb_line_chat...
 [*] 維度驗證通過: 768
-[*] 已註冊工具: db_troubleshooting — 常見故障排除與維修指南
+[*] 已註冊工具: db_line_chat — LINE 客服對話知識庫：真實客戶問答紀錄 (ui_type=TEXT)
+[*] 初始化 Embedding: 載入 Vertex AI (模型: text-embedding-004)
+[*] 初始化 PGVector: collection=kb_youtube...
+[*] 維度驗證通過: 768
+[*] 已註冊工具: db_youtube — YouTube 教學影片知識庫：電子鎖影片教學 (ui_type=VIDEO_CARD)
 [*] 初始化 Async API 模組: 準備連線至 http://localhost:8000/v1/status ...
-[*] 已註冊工具: db_order_api — 查詢即時訂單狀態與報修進度
+[*] 已註冊工具: db_order_api — 查詢即時訂單狀態與報修進度 (ui_type=TEXT)
 [*] 初始化 Web Search 模組: 使用 duckduckgo...
-[*] 已註冊工具: db_web_search — 網際網路搜尋引擎
+[*] 已註冊工具: db_web_search — 網際網路搜尋引擎 (ui_type=TEXT)
 [*] 已註冊工具: transfer_to_human — 轉接真人客服
 [*] 已建構 Agent: product_expert — 產品規格專家
 [*] 已建構 Agent: troubleshooter — 故障排除專家
+[*] 已建構 Agent: youtuber — youtube教學影片專家
 [*] 已建構 Agent: order_clerk — 訂單查詢專員
 [*] 已建構 Agent: web_researcher — 網路搜尋助手
 [*] 初始化記憶體模組: 使用 postgres 機制...
 [*] 初始化記憶體模組: 連線至 PostgreSQL
 
->>> [demo] 我的 Philips Alpha 指紋怎麼設定？
+>>> [demo] Dormakaba 鎖舌卡住怎麼處理？
   [pre_process] 正在準備輸入...
   [pre_process] demo 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
+  [rewrite_query] 問題無需改寫
   [router] 正在分類意圖...
-  [router] 意圖分類結果: ['general_knowledge']
-  [router] 派發目標: ['product_expert']
-  [product_expert:agent_llm] LLM 正在思考...
-  [product_expert:agent_llm] 回應類型: tool_calls
-  [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_smartlock_manual: 正在檢索 'Philips Alpha 指紋設定'...
-  [Tool 結果] db_smartlock_manual: 回傳 584 字元
-  [product_expert:agent_llm] LLM 正在思考...
-  [product_expert:agent_llm] 回應類型: text
+  [router] 意圖分類結果: ['troubleshooting']
+  [router] 派發目標: ['troubleshooter']
+  [troubleshooter:agent_llm] LLM 正在思考...
+  [troubleshooter:agent_llm] 回應類型: tool_calls
+  [troubleshooter:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_line_chat: 正在檢索 'Dormakaba 鎖舌卡住'...
+  [Tool 結果] db_line_chat: 回傳 838 字元
+  [troubleshooter:agent_llm] LLM 正在思考...
+  [troubleshooter:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！關於 Phil...
+  [merge_answers] 最終回覆: 您好！關於Dorma...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] fact 寫入: device_model=Alpha
-  [update_profile] fact 寫入: device_brand=Philips
+  [update_profile] fact 寫入: device_brand=Dormakaba
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！關於 Philips Alpha 指紋電子鎖的指紋設定方式，目前資料庫中沒有找到詳細的操作步驟。
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好！關於Dormakaba電子鎖鎖舌卡住的問題，我查詢了相關資料，目前沒有直接的解決方案。
 
-不過，我可以提供您 Philips Alpha 的產品規格：
+不過，我可以先提供一些常見的初步檢查步驟，或許能幫助您判斷問題：
 
-1.  品牌：Philips
-2.  型號：Alpha
-3.  解鎖方式：指紋（半導體感應）、密碼（6-12 位）、卡片（Mifare）、機械鑰匙、藍牙 App
-4.  指紋容量：最多 100 組
+1.  確認門扇是否變形或下垂：請檢查門框與門扇之間是否有摩擦或間隙不均的情況，這可能會導致鎖舌無法順暢進出。
+2.  檢查鎖舌是否有異物卡住：請仔細查看鎖舌周圍是否有灰塵、碎屑或其他異物阻礙了鎖舌的正常伸縮。
+3.  嘗試輕輕推拉門扇：在轉動把手或鑰匙的同時，輕輕推或拉門扇，看看鎖舌是否能順利收回。
+4.  檢查把手或旋鈕是否能正常操作：確認把手或內側旋鈕在沒有卡住的情況下，是否能正常轉動並帶動鎖舌。
 
-通常指紋設定會需要進入門鎖的管理模式，然後依照語音提示或螢幕指示進行操作。
+為了能更精確地協助您，請問您是否能提供更多細節呢？例如：
+1.  鎖舌是完全卡住無法動彈，還是可以動一點點但無法完全收回？
+2.  這個情況是突然發生的，還是之前就有一些徵兆？
+3.  門鎖是否有發出任何異常聲音？
 
-如果您需要更詳細的設定步驟，建議您可以參考產品說明書，或是提供說明書上的相關章節，我可以再幫您查找看看。
+請您提供更多資訊，我會盡力協助您。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
-├── router → product_expert
-├── product_expert
+├── rewrite_query
+├── router → troubleshooter
+├── troubleshooter
 │   ├── agent_llm
 │   ├── tool_node
 │   └── agent_llm
@@ -69,45 +79,38 @@
 [記憶] messages=4, summary=0字
 
 [Facts] demo:
-  device_brand    = Philips                        [CURRENT] 2026-03-15 15:43:20 ~ —
-  device_model    = Alpha                          [CURRENT] 2026-03-15 15:43:09 ~ —
+  device_brand    = Dormakaba                      [CURRENT] 2026-03-20 02:10:45 ~ —
 
->>> [demo] 指紋辨識不靈敏，按好幾次才能開門
+>>> [demo] Chainlock 怎麼進入設定模式？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (305 字元)
+  [pre_process] 已載入 demo 的輪廓 (158 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 5 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 4 <= 閾值 10，跳過壓縮
+  [rewrite_query] 問題無需改寫
   [router] 正在分類意圖...
-  [router] 意圖分類結果: ['troubleshooting']
-  [router] 派發目標: ['troubleshooter']
-  [troubleshooter:agent_llm] LLM 正在思考...
-  [troubleshooter:agent_llm] 回應類型: tool_calls
-  [troubleshooter:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_troubleshooting: 正在檢索 'Philips Alpha 指紋辨識不靈敏'...
-  [Tool 結果] db_troubleshooting: 回傳 545 字元
-  [troubleshooter:agent_llm] LLM 正在思考...
-  [troubleshooter:agent_llm] 回應類型: text
+  [router] 意圖分類結果: ['general_knowledge']
+  [router] 派發目標: ['product_expert']
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'Chainlock 怎麼進入設定模式？'...
+  [Tool 結果] db_video: 回傳 1285 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！了解到您的 P...
+  [merge_answers] 最終回覆: Chainlock ...
   [update_profile] 正在更新使用者輪廓...
+  [update_profile] fact 寫入: device_brand=Chainlock
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！了解到您的 Philips Alpha 電子鎖指紋辨識不太靈敏，需要按好幾次才能開門，這確實會造成不便。
-
-根據您描述的狀況，您可以先嘗試以下幾個排查步驟，看看是否能改善問題：
-
-1.  請先確認您的手指是否乾淨，沒有汗水、油污，或是否過於乾燥。這些都可能影響指紋感應的準確性。
-2.  檢查一下指紋感應區，看看是否有明顯的刮痕或髒污，這也可能影響感應效果。
-3.  您可以試著使用不同的手指進行解鎖，看看是否只有特定手指有這個問題。
-4.  嘗試重新啟動您的電子鎖：請將門鎖內部的電池拔除，等待大約 10 秒後再重新裝入。
-5.  如果上述方法都無效，您可以嘗試在管理員選單中，將目前辨識不靈敏的指紋刪除，然後再重新錄製一次。
-
-如果嘗試了這些步驟後，指紋辨識仍然不靈敏，請再告訴我，我們可以進一步協助您。
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] Chainlock AI99、A90、AI88等有觸控螢幕的電子鎖，要進入設定選單，請先點擊螢幕上的齒輪圖示。系統會要求進行管理者驗證，您可以選擇掌靜脈、人臉、密碼、卡片或指紋其中一種方式來驗證。驗證成功後，就可以進入用戶管理介面進行設定了。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
-├── router → troubleshooter
-├── troubleshooter
+├── rewrite_query
+├── router → product_expert
+├── product_expert
 │   ├── agent_llm
 │   ├── tool_node
 │   └── agent_llm
@@ -117,40 +120,46 @@
 [記憶] messages=8, summary=0字
 
 
->>> [demo] 清潔過感應區了還是一樣
+>>> [demo] 門把按下去不會彈回來是什麼問題？可以維修嗎？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (289 字元)
+  [pre_process] 已載入 demo 的輪廓 (167 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 9 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 8 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 門把按下去不會彈回來是什麼問題？可以維修嗎？ → Chainlock 電子鎖門把按下去不會彈回來是什麼問題？可以維修嗎？
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['troubleshooting']
   [router] 派發目標: ['troubleshooter']
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: tool_calls
   [troubleshooter:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_troubleshooting: 正在檢索 'Philips Alpha 指紋辨識不靈敏 清潔後無改善不大'...
-  [Tool 結果] db_troubleshooting: 回傳 545 字元
+  [Tool 呼叫] db_line_chat: 正在檢索 'Chainlock 電子鎖門把按下去不會彈回來'...
+  [Tool 結果] db_line_chat: 回傳 729 字元
   [troubleshooter:agent_llm] LLM 正在思考...
   [troubleshooter:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！很抱歉清潔過感...
+  [merge_answers] 最終回覆: 您好！關於Chain...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！很抱歉清潔過感應區後，指紋辨識不靈敏的問題還是沒有改善。
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好！關於Chainlock電子鎖門把按下去不會彈回來的問題，我在資料庫中沒有找到直接相關的資訊。
 
-根據您描述的狀況，我們可以再試試看以下幾個排查步驟：
+不過，這類問題通常可能與以下幾個原因有關：
+1.  門鎖內部機械結構卡住或損壞。
+2.  門把彈簧疲乏或斷裂。
+3.  安裝問題導致門把運作不順暢。
 
-1.  確認手指狀況：請您再確認一下，在感應指紋時，手指上是否有汗水、油污，或是手指會不會太乾燥呢？這些都可能會影響指紋辨識的靈敏度喔。
-2.  檢查感應區：請您仔細檢查一下指紋感應區，看看是否有明顯的刮痕，因為嚴重的刮痕可能會影響感應效果。
-3.  嘗試不同手指：您可以試著用其他已經錄製好的手指來解鎖，看看是否也有同樣不靈敏的狀況。
-4.  重新啟動門鎖：請您將電子鎖內部的電池拔除，等待大約 10 秒鐘後再重新裝入，這樣可以讓門鎖重新啟動。
-5.  重新錄製指紋：如果以上方法都試過了，您可以嘗試進入管理員選單，將目前不靈敏的指紋刪除，然後再重新錄製一次。有時候重新錄製可以改善辨識效果。
+為了能更精確地協助您，請問您方便提供您的Chainlock電子鎖型號嗎？有了型號，我或許能找到更具體的排解步驟。
 
-請您試試看這些方法，如果還是沒有改善，再告訴我喔！
+同時，您可以先嘗試以下基本檢查：
+1.  檢查門把周圍是否有異物卡住。
+2.  輕輕轉動門把幾次，看是否能恢復正常。
+
+如果這些方法都無法解決問題，通常會需要專業人員進行檢測和維修。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
+├── rewrite_query
 ├── router → troubleshooter
 ├── troubleshooter
 │   ├── agent_llm
@@ -162,38 +171,50 @@
 [記憶] messages=12, summary=0字
 
 
->>> [demo] 電池快沒電會有什麼提示嗎？
+>>> [demo] 推拉式和把手式電子鎖差在哪？
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo 的輪廓 (227 字元)
+  [pre_process] 已載入 demo 的輪廓 (171 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 已生成摘要 (325 字元)
-  [manage_memory] 刪除 9 條舊訊息，保留 4 條
+  [manage_memory] 已生成摘要 (181 字元)
+  [manage_memory] 刪除 8 條舊訊息，保留 4 條
+  [rewrite_query] 改寫: 推拉式和把手式電子鎖差在哪？ → Chainlock推拉式電子鎖與把手式電子鎖有何差異？
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['general_knowledge']
   [router] 派發目標: ['product_expert']
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: tool_calls
   [product_expert:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_smartlock_manual: 正在檢索 'Philips Alpha 電池快沒電提示'...
-  [Tool 結果] db_smartlock_manual: 回傳 584 字元
+  [Tool 呼叫] db_video: 正在檢索 'Chainlock 推拉式電子鎖 把手式電子鎖 差異'...
+  [Tool 結果] db_video: 回傳 1285 字元
   [product_expert:agent_llm] LLM 正在思考...
   [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！關於 Phil...
+  [merge_answers] 最終回覆: 您好，很抱歉，我們的...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] 已更新 demo 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！關於 Philips Alpha 電子鎖電池快沒電的提示，我在資料庫中沒有找到具體的說明。
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好，很抱歉，我們的資料庫中沒有直接比較Chainlock推拉式電子鎖與把手式電子鎖差異的詳細資訊。
 
-不過，一般電子鎖在電池電量較低時，通常會有以下幾種提示方式：
-1.  語音提示：在開鎖或關鎖時，會發出「電量不足」或類似的語音提醒。
-2.  燈光指示：面板上的指示燈可能會閃爍紅色或其他顏色，以表示電量低。
-3.  螢幕顯示：如果電子鎖有螢幕，可能會直接顯示電池電量不足的圖示或文字。
+不過，我可以根據一般電子鎖的常見設計，為您說明這兩種鎖具的普遍差異：
 
-建議您可以留意電子鎖在操作時是否有上述的提示。如果仍不確定，可以參考產品說明書，或是提供更詳細的使用情境，我會再嘗試協助您。
+1.  操作方式：
+    推拉式電子鎖：通常採用一體式設計，開門時只需輕推或輕拉門把即可，操作直覺且省力，尤其在手提重物時更為方便。
+    把手式電子鎖：外觀與傳統門把相似，開門時需要下壓或轉動把手。
+
+2.  外觀設計：
+    推拉式電子鎖：設計通常較為現代簡潔，線條流暢，整體感較強。
+    把手式電子鎖：外觀選擇多樣，從傳統到現代風格都有，能更好地融入不同裝潢風格。
+
+3.  安裝要求：
+    推拉式電子鎖：由於其特殊的開門機制，對門體和安裝空間可能有特定的要求。
+    把手式電子鎖：安裝方式與傳統門鎖較為接近，適用性較廣。
+
+如果您能提供具體的Chainlock電子鎖型號，我可以嘗試為您查詢更精確的產品規格資訊。
 [路徑]
 ├── pre_process
 ├── manage_memory → summarized
+├── rewrite_query
 ├── router → product_expert
 ├── product_expert
 │   ├── agent_llm
@@ -202,92 +223,179 @@
 ├── merge_answers
 ├── update_profile
 └── post_process
-[記憶] messages=7, summary=325字
-[摘要] **產品/品牌/型號：** P...
+[記憶] messages=8, summary=181字
+[摘要] 使用者反映Dormakaba電...
+
+
+>>> [demo_YT] 請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？
+  [pre_process] 正在準備輸入...
+  [pre_process] demo_YT 尚無歷史輪廓
+  [manage_memory] 檢查是否需要壓縮記憶...
+  [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
+  [rewrite_query] 問題無需改寫
+  [router] 正在分類意圖...
+  [router] 意圖分類結果: ['general_knowledge']
+  [router] 派發目標: ['product_expert']
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 App 加入家人'...
+  [Tool 結果] db_video: 回傳 1206 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: text
+  [merge_answers] 正在提取並合併回覆...
+  [merge_answers] 最終回覆: 您好，關於如何在 C...
+  [update_profile] 正在更新使用者輪廓...
+  [update_profile] fact 寫入: device_model=AI-99
+  [update_profile] fact 寫入: device_brand=Chatlock
+  [update_profile] 已更新 demo_YT 的軟輪廓
+  [post_process] 回傳最終回覆...
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好，關於如何在 Chatlock AI-99 App 中加入家人讓他們也能開門，我目前在資料庫中沒有找到直接的教學影片或步驟說明。
+
+不過，通常這類型的智慧門鎖應用程式，都會在 App 裡面提供「使用者管理」、「成員設定」或「家庭成員」等相關選項。您可以嘗試在 Chatlock AI-99 App 中尋找這些功能，通常可以在設定（Settings）或個人檔案（Profile）的區塊找到。
+
+如果您在 App 中找不到相關設定，或是需要更詳細的步驟，建議您可以提供更多 App 介面的資訊，或者我也可以嘗試用其他關鍵字再幫您找找看。
+[路徑]
+├── pre_process
+├── manage_memory → skip
+├── rewrite_query
+├── router → product_expert
+├── product_expert
+│   ├── agent_llm
+│   ├── tool_node
+│   └── agent_llm
+├── merge_answers
+├── update_profile
+└── post_process
+[記憶] messages=4, summary=0字
+
+
+>>> [demo_YT] 解除綁定和解綁並清除數據有什麼差別？
+  [pre_process] 正在準備輸入...
+  [pre_process] 已載入 demo_YT 的輪廓 (280 字元)
+  [manage_memory] 檢查是否需要壓縮記憶...
+  [manage_memory] 訊息數 4 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 解除綁定和解綁並清除數據有什麼差別？ → Chatlock AI-99 App中，解除綁定與解除綁定並清除數據的區別是什麼？
+  [router] 正在分類意圖...
+  [router] 意圖分類結果: ['general_knowledge']
+  [router] 派發目標: ['product_expert']
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'Chatlock AI-99 App 解除綁定 解除綁定並清除數據 區別'...
+  [Tool 結果] db_video: 回傳 1307 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: text
+  [merge_answers] 正在提取並合併回覆...
+  [merge_answers] 最終回覆: 您好！關於Chatl...
+  [update_profile] 正在更新使用者輪廓...
+  [update_profile] 已更新 demo_YT 的軟輪廓
+  [post_process] 回傳最終回覆...
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好！關於Chatlock AI-99 App 中「解除綁定」與「解除綁定並清除數據」的區別，我在資料庫中沒有找到直接的說明。
+
+不過，一般來說：
+
+1.  解除綁定：通常是指將您的裝置（例如電子鎖）從您的App帳戶中移除連結。這表示您的App將不再能控制或接收該裝置的資訊，但裝置本身可能還會保留一些設定或數據。
+
+2.  解除綁定並清除數據：這通常不僅會將裝置從您的App帳戶中移除，還會嘗試清除裝置上與App相關的所有數據和設定，將其恢復到更接近出廠預設的狀態。這可能包括用戶資料、密碼、指紋等。
+
+由於不同App的設計可能有所差異，建議您可以查閱Chatlock AI-99 App的用戶手冊，或直接聯繫Chatlock的客服，以獲得最精確的資訊。
+[路徑]
+├── pre_process
+├── manage_memory → skip
+├── rewrite_query
+├── router → product_expert
+├── product_expert
+│   ├── agent_llm
+│   ├── tool_node
+│   └── agent_llm
+├── merge_answers
+├── update_profile
+└── post_process
+[記憶] messages=8, summary=0字
 
 
 >>> [demo_ood] 今天台北天氣如何？
   [pre_process] 正在準備輸入...
   [pre_process] demo_ood 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
+  [rewrite_query] 問題無需改寫
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['out_of_domain']
   [router] 直接處理 out_of_domain...
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 您好！很抱歉，我無法...
+  [merge_answers] 最終回覆: 您好，很抱歉，我這裡...
   [update_profile] 正在更新使用者輪廓...
   [post_process] 回傳最終回覆...
-[回覆] 您好！很抱歉，我無法提供天氣資訊。
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好，很抱歉，我這裡主要負責電子鎖與智慧門鎖的產品、安裝、故障排除及售後服務。天氣資訊不在我的服務範圍內喔。
 
-我主要負責處理電子鎖、智慧門鎖的產品諮詢、安裝、故障排除及售後服務等相關問題。
-
-若您有任何關於電子鎖或智慧門鎖的疑問，都非常歡迎您提出，我會盡力協助您！
+如果您有任何關於電子鎖的問題，都歡迎隨時提出，我很樂意為您服務！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
+├── rewrite_query
 ├── router → out_of_domain
 ├── merge_answers
 ├── update_profile
 └── post_process
 
 
->>> [demo_multi] 幫我查訂單 ORD-20260301 的進度，另外有推薦支援 HomeKey 的電子鎖嗎？
+>>> [demo_multi] 幫我查訂單 ORD-20260301 的進度，另外 FAMMIX SAFER-2 電子鎖有哪些解鎖功能？
   [pre_process] 正在準備輸入...
   [pre_process] demo_multi 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 幫我查訂單 ORD-20260301 的進度，另外 FAMMIX SAFER-2 電子鎖有哪些解鎖功能？ → 查詢訂單 ORD-20260301 進度與 FAMMIX SAFER-2 電子鎖解鎖功能
   [router] 正在分類意圖...
-  [router] 意圖分類結果: ['order_status', 'web_search']
-  [router] 派發目標: ['order_clerk', 'web_researcher']
+  [router] 意圖分類結果: ['order_status', 'general_knowledge']
+  [router] 派發目標: ['order_clerk', 'product_expert']
   [order_clerk:agent_llm] LLM 正在思考...
-  [web_researcher:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] LLM 正在思考...
   [order_clerk:agent_llm] 回應類型: tool_calls
   [order_clerk:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_order_api: 正在檢索 '查詢訂單 ORD-20260301 進度'...
-  [Tool 結果] db_order_api: 回傳 128 字元
+  [Tool 呼叫] db_order_api: 正在檢索 '查詢訂單 ORD-20260301 進度與 FAMMIX SAFER-2 電子鎖解鎖功能'...
+  [Tool 結果] db_order_api: 回傳 42 字元
   [order_clerk:agent_llm] LLM 正在思考...
-  [web_researcher:agent_llm] 回應類型: tool_calls
-  [web_researcher:tool_node] 正在執行工具呼叫...
-  [Tool 呼叫] db_web_search: 正在檢索 '支援 HomeKey 的電子鎖推薦'...
   [order_clerk:agent_llm] 回應類型: text
-  [Tool 結果] db_web_search: 回傳 927 字元
-  [web_researcher:agent_llm] LLM 正在思考...
-  [web_researcher:agent_llm] 回應類型: text
+  [product_expert:agent_llm] 回應類型: tool_calls
+  [product_expert:tool_node] 正在執行工具呼叫...
+  [Tool 呼叫] db_video: 正在檢索 'FAMMIX SAFER-2 電子鎖解鎖功能'...
+  [Tool 結果] db_video: 回傳 1294 字元
+  [product_expert:agent_llm] LLM 正在思考...
+  [product_expert:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
   [merge_answers] 合併 2 段 agent 回覆...
-  [merge_answers] 最終回覆: 您好！關於您的訂單 ...
+  [merge_answers] 最終回覆: 您好，很抱歉，目前系...
   [update_profile] 正在更新使用者輪廓...
-  [update_profile] fact 寫入: device_model=Alpha 指紋電子鎖
-  [update_profile] fact 寫入: device_brand=Philips
+  [update_profile] fact 寫入: device_model=SAFER-2
+  [update_profile] fact 寫入: device_brand=FAMMIX
   [update_profile] 已更新 demo_multi 的軟輪廓
   [post_process] 回傳最終回覆...
-[回覆] 您好！關於您的訂單 ORD-20260301，查詢結果如下：
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好，很抱歉，目前系統無法查詢訂單進度，請您稍後再試。
 
-訂單編號：ORD-20260301
-商品：Philips Alpha 指紋電子鎖
-狀態：已出貨
-物流：黑貓宅急便（追蹤碼：TC-20260302-001）
-預計到貨：2026 年 3 月 4 日下午
-備註：商品已於 3/2 從台北倉庫出貨
+關於FAMMIX SAFER-2 電子鎖的解鎖功能，為了能更精確地協助您，請問您是想了解哪方面的資訊呢？例如：
 
-至於您詢問推薦支援 HomeKey 的電子鎖，我們理解您對此功能的需求。目前直接推薦支援 HomeKey 的特定型號資訊相對較少，但您可以參考以下一般性的電子鎖選購資訊：
-1. 台灣推薦王有整理「電子鎖推薦十大精選排行榜」。
-2. myfone.blog 有文章說明「電子鎖怎麼挑選？一次看懂智慧門鎖4大挑選重點與電子鎖推薦」。
-3. TikTok 上有提到「moorgen T5 電子鎖」。
+1.  如何設定解鎖方式（指紋、密碼、卡片等）？
+2.  解鎖時遇到什麼問題？
+3.  想了解特定解鎖方式（如指紋、密碼、卡片）的操作步驟？
+4.  或是其他特定的問題？
 
-為確保資訊的準確性，建議您直接查詢您感興趣品牌的官方網站，或諮詢我們的產品銷售部門，他們將能提供更詳細的 HomeKey 功能支援資訊與推薦。
-
-請問您還有其他關於電子鎖的問題嗎？例如安裝、故障排除或售後服務方面，我們很樂意為您提供協助。
+如果您能提供更多細節，或是電子鎖的使用手冊，我會盡力協助您。
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
-├── router → order_clerk+web_researcher
+├── rewrite_query
+├── router → order_clerk+product_expert
 ├── order_clerk
 │   ├── agent_llm
 │   ├── tool_node
 │   └── agent_llm
-├── web_researcher
+├── product_expert
 │   ├── agent_llm
 │   ├── tool_node
 │   └── agent_llm
@@ -300,7 +408,8 @@
   [pre_process] 正在準備輸入...
   [pre_process] demo_human 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
+  [rewrite_query] 問題無需改寫
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['transfer_human']
   [router] 直接處理 transfer_human...
@@ -313,6 +422,7 @@
   [update_profile] fact 寫入: address=台北市信義區松仁路 100 號 12 樓
   [update_profile] 已更新 demo_human 的軟輪廓
   [post_process] 回傳最終回覆...
+  [UI Factory] 回覆類型: TEXT（純文字）
 [回覆] 您好
 麻煩您確認並補充以下資訊
 聯絡地址：我住台北市信義區松仁路 100 號 12 樓
@@ -323,6 +433,7 @@
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
+├── rewrite_query
 ├── router → transfer_human
 ├── [FLAG] topic_resolved
 ├── merge_answers
@@ -330,14 +441,15 @@
 └── post_process
 
 [Facts] demo_human:
-  address         = 台北市信義區松仁路 100 號 12 樓           [CURRENT] 2026-03-15 15:44:35 ~ —
-  phone           = 0912-345-678                   [CURRENT] 2026-03-15 15:44:30 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [CURRENT] 2026-03-20 02:13:20 ~ —
+  phone           = 0912-345-678                   [CURRENT] 2026-03-20 02:13:13 ~ —
 
->>> [demo_guardrail] 這款電子鎖多少錢？可以報價嗎？
+>>> [demo_guardrail] 有網路功能的電子鎖大概多少錢？可以報價嗎？
   [pre_process] 正在準備輸入...
   [pre_process] demo_guardrail 尚無歷史輪廓
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 0 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 有網路功能的電子鎖大概多少錢？可以報價嗎？ → 有網路功能的電子鎖價格報價
   [router] 正在分類意圖...
   [Guardrail] 偵測到敏感詞彙「報價」，強制轉接真人
   [Tool 呼叫] transfer_to_human: user_id=demo_guardrail
@@ -347,6 +459,7 @@
   [update_profile] 正在更新使用者輪廓...
   [update_profile] 已更新 demo_guardrail 的軟輪廓
   [post_process] 回傳最終回覆...
+  [UI Factory] 回覆類型: TEXT（純文字）
 [回覆] 您好
 麻煩您留下以下資訊
 聯絡地址：
@@ -357,6 +470,7 @@
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
+├── rewrite_query
 ├── [FLAG] guardrail_triggered
 ├── [FLAG] topic_resolved
 ├── merge_answers
@@ -366,31 +480,36 @@
 
 >>> [demo_human] 我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo_human 的輪廓 (150 字元)
+  [pre_process] 已載入 demo_human 的輪廓 (290 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 2 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 1 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 我搬家了，新地址是新北市板橋區文化路一段 200 號 5 樓 → 客戶地址更新：由 台北市信義區松仁路 100 號 12 樓 變更為 新北市板橋區文化路一段 200 號 5 樓
   [router] 正在分類意圖...
-  [router] 意圖分類結果: ['general_knowledge']
-  [router] 派發目標: ['product_expert']
-  [product_expert:agent_llm] LLM 正在思考...
-  [product_expert:agent_llm] 回應類型: tool_calls
-  [product_expert:tool_node] 正在執行工具呼叫...
+  [router] 意圖分類結果: ['order_status']
+  [router] 派發目標: ['order_clerk']
+  [order_clerk:agent_llm] LLM 正在思考...
+  [order_clerk:agent_llm] 回應類型: tool_calls
+  [order_clerk:tool_node] 正在執行工具呼叫...
   [Tool 呼叫] transfer_to_human: user_id=0912-345-678
-  [product_expert:agent_llm] LLM 正在思考...
-  [product_expert:agent_llm] 回應類型: text
+  [order_clerk:agent_llm] LLM 正在思考...
+  [order_clerk:agent_llm] 回應類型: text
   [merge_answers] 正在提取並合併回覆...
-  [merge_answers] 最終回覆: 好的，我們已經收到您...
+  [merge_answers] 最終回覆: 您好，關於您的地址更...
   [update_profile] 正在更新使用者輪廓...
   [update_profile] fact 寫入: address=新北市板橋區文化路一段 200 號 5 樓
   [post_process] 回傳最終回覆...
-[回覆] 好的，我們已經收到您更新的地址資訊：新北市板橋區文化路一段 200 號 5 樓。
+  [UI Factory] 回覆類型: TEXT（純文字）
+[回覆] 您好，關於您的地址更新需求，由於我目前無法直接為您修改系統中的客戶資料，我已經為您轉接給真人客服專員處理。
 
-請問您在電子鎖或智慧門鎖方面有什麼需要協助的地方嗎？
+真人客服專員會與您聯繫，並協助您更新地址資訊。
+
+謝謝您的配合！
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
-├── router → product_expert
-├── product_expert
+├── rewrite_query
+├── router → order_clerk
+├── order_clerk
 │   ├── agent_llm
 │   ├── tool_node
 │   └── agent_llm
@@ -400,15 +519,16 @@
 └── post_process
 
 [Facts] demo_human:
-  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-15 15:44:36 ~ —
-  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-15 15:44:35 ~ 2026-03-15 15:44:36
-  phone           = 0912-345-678                   [CURRENT] 2026-03-15 15:44:30 ~ —
+  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-20 02:13:20 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-20 02:13:20 ~ 2026-03-20 02:13:20
+  phone           = 0912-345-678                   [CURRENT] 2026-03-20 02:13:13 ~ —
 
 >>> [demo_human] 我要找真人客服，請幫我轉接真人
   [pre_process] 正在準備輸入...
-  [pre_process] 已載入 demo_human 的輪廓 (151 字元)
+  [pre_process] 已載入 demo_human 的輪廓 (291 字元)
   [manage_memory] 檢查是否需要壓縮記憶...
-  [manage_memory] 訊息數 6 <= 閾值 10，跳過壓縮
+  [manage_memory] 訊息數 5 <= 閾值 10，跳過壓縮
+  [rewrite_query] 改寫: 我要找真人客服，請幫我轉接真人 → 電子鎖/智慧門鎖服務或故障排除真人客服轉接需求
   [router] 正在分類意圖...
   [router] 意圖分類結果: ['transfer_human']
   [router] 直接處理 transfer_human...
@@ -419,6 +539,7 @@
   [update_profile] 正在更新使用者輪廓...
   [update_profile] 已更新 demo_human 的軟輪廓
   [post_process] 回傳最終回覆...
+  [UI Factory] 回覆類型: TEXT（純文字）
 [回覆] 您好
 麻煩您確認並補充以下資訊
 聯絡地址：新北市板橋區文化路一段 200 號 5 樓
@@ -429,6 +550,7 @@
 [路徑]
 ├── pre_process
 ├── manage_memory → skip
+├── rewrite_query
 ├── router → transfer_human
 ├── [FLAG] topic_resolved
 ├── merge_answers
@@ -436,28 +558,25 @@
 └── post_process
 
 ========================================
-[最終] thread=demo, messages=7, summary=325字
-[摘要] **產品/品牌/型號：** Philips Alpha 電子鎖
+[最終] thread=demo, messages=8, summary=181字
+[摘要] 使用者反映Dormakaba電子鎖鎖舌卡住，客服提供了初步檢查步驟（檢查門扇變形、異物、輕推拉門扇、把手操作），並詢問鎖舌卡住程度、發生時間及是否有異音，此問題仍在進行中。
 
-**問題與狀態：**
-1.  **指紋設定方式：** 使用者曾詢問設定方法，客服提供了產品規格及一般設定建議，並建議參考說明書。此問題已轉為指紋辨識不靈敏的後續處理。
-2.  **指紋辨識不靈敏：** (進行中) 使用者反映 Philips Alpha 電子鎖指紋辨識需多次嘗試才能解鎖。
-    *   **已嘗試排查：** 使用者已清潔指紋感應區，但問題仍存在。
-    *   **客服建議排查：** 確認手指乾淨、檢查感應區有無刮痕/髒污、嘗試不同手指、重啟電子鎖、刪除並重新錄製指紋。
-
-**目前狀況：** 清潔感應區後指紋辨識仍不靈敏，客服建議的其他排查步驟待使用者嘗試。
+使用者另詢問Chainlock AI99、A90、AI88等觸控螢幕電子鎖如何進入設定模式。客服說明需點擊螢幕齒輪圖示，並透過掌靜脈、人臉、密碼、卡片或指紋進行管理者驗證，此問題已解決。
 
 ========================================
 [Facts 總覽]
 [Facts] demo:
-  device_brand    = Philips                        [CURRENT] 2026-03-15 15:43:20 ~ —
-  device_model    = Alpha                          [CURRENT] 2026-03-15 15:43:09 ~ —
+  device_brand    = Chainlock                      [CURRENT] 2026-03-20 02:11:04 ~ —
+  device_brand    = Dormakaba                      [EXPIRED] 2026-03-20 02:10:45 ~ 2026-03-20 02:11:04
+[Facts] demo_YT:
+  device_brand    = Chatlock                       [CURRENT] 2026-03-20 02:12:17 ~ —
+  device_model    = AI-99                          [CURRENT] 2026-03-20 02:11:20 ~ —
 [Facts] demo_human:
-  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-15 15:44:36 ~ —
-  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-15 15:44:35 ~ 2026-03-15 15:44:36
-  phone           = 0912-345-678                   [CURRENT] 2026-03-15 15:44:30 ~ —
+  address         = 新北市板橋區文化路一段 200 號 5 樓          [CURRENT] 2026-03-20 02:13:20 ~ —
+  address         = 台北市信義區松仁路 100 號 12 樓           [EXPIRED] 2026-03-20 02:13:20 ~ 2026-03-20 02:13:20
+  phone           = 0912-345-678                   [CURRENT] 2026-03-20 02:13:13 ~ —
 [Facts] demo_ood: (無記錄)
 [Facts] demo_multi:
-  device_brand    = Philips                        [CURRENT] 2026-03-15 15:44:29 ~ —
-  device_model    = Alpha 指紋電子鎖                    [CURRENT] 2026-03-15 15:43:20 ~ —
+  device_brand    = FAMMIX                         [CURRENT] 2026-03-20 02:13:12 ~ —
+  device_model    = SAFER-2                        [CURRENT] 2026-03-20 02:12:18 ~ —
 [Facts] demo_guardrail: (無記錄)
