@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 from functools import partial
 from langchain_postgres import PGVector
 from .base_retriever import BaseRetriever
@@ -14,6 +15,7 @@ class PGVectorRetriever(BaseRetriever):
     def setup(self):
         self.collection_name = self.config.get("collection_name", self.config["name"])
         self.top_k = self.config.get("top_k", 2)
+        self.strip_keywords = self.config.get("query_strip_keywords", [])
 
         connection_uri_env = self.config.get("connection_uri_env", "PG_VECTOR_URI")
         connection_uri = os.environ.get(connection_uri_env)
@@ -44,7 +46,21 @@ class PGVectorRetriever(BaseRetriever):
                 )
             print(f"[*] 維度驗證通過: {actual_dim}")
 
+    def _clean_query(self, question: str) -> str:
+        """移除 query 中的高頻品牌名等噪音詞，讓向量搜尋聚焦操作語義。"""
+        if not self.strip_keywords:
+            return question
+        cleaned = question
+        for kw in self.strip_keywords:
+            cleaned = re.sub(re.escape(kw), "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned or question
+
     async def aretrieve(self, question: str) -> str:
+        search_query = self._clean_query(question)
+        if search_query != question:
+            print(f"  [Query 清洗] '{question}' → '{search_query}'")
+
         loop = asyncio.get_event_loop()
         # 採用 MMR (Maximal Marginal Relevance) 演算法，提升檢索結果的多樣性
         # fetch_k = k * 3 是經驗值，表示先撈出 3 倍數量的候選人，再從中挑選 k 個最多樣化的
@@ -52,7 +68,7 @@ class PGVectorRetriever(BaseRetriever):
             None,
             partial(
                 self.vector_store.max_marginal_relevance_search,
-                question,
+                search_query,
                 k=self.top_k,
                 fetch_k=self.top_k * 3
             ),

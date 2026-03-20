@@ -118,6 +118,7 @@ collection_name    = "kb_youtube"
 connection_uri_env = "PG_VECTOR_URI"
 top_k              = 6
 ui_type            = "VIDEO_CARD"
+query_strip_keywords = ["Chatlock"]
 embedding_provider       = "vertexai"
 embedding_model          = "text-embedding-004"
 embedding_project_id_env = "VERTEX_PROJECT_ID"
@@ -179,7 +180,7 @@ max_results   = 3
 name        = "product_expert"
 label       = "產品規格專家"
 description = "負責回答產品規格、設定操作、保固相關問題"
-tools       = ["db_video", "transfer_to_human"]
+tools       = ["db_video", "db_youtube", "transfer_to_human"]
 prompt_file = "agents/prompts/product_expert.md"
 
 [[agents]]
@@ -247,7 +248,7 @@ require_slots = true
 [[intents]]
 name          = "youtube_knowledge"
 label         = "youtube產品教學影片"
-description   = "youtube關於產品如何設定與一般操作"
+description   = "使用者要求觀看影片、教學影片、操作示範影片、YouTube 教學，或提到「影片」「video」「看影片」「給我影片」等詞彙時，歸類到此意圖"
 target        = "youtuber"
 require_slots = true
 
