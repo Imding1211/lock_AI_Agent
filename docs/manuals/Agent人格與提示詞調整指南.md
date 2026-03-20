@@ -13,6 +13,8 @@
 *   `troubleshooter.md`: **故障排除專家**。
 *   `order_clerk.md`: **訂單查詢專員**。
 *   `web_researcher.md`: **網路搜尋助手**。
+*   `youtuber.md`: **YouTube 教學影片專家**。
+*   `receptionist.md`: **前台接待專員**（tool-less，不使用任何檢索工具）。
 *   `summarize_messages.md`: **記憶壓縮器**。負責將對話精煉為摘要。
 *   `merge_answers.md`: **回覆合併器**。當多個意圖同時觸發時，負責將多段回答融合成一段自然文字。
 *   `rewrite_query.md`: **問題改寫專家**。負責在 Router 之前，解析代名詞、融合使用者輪廓與前情提要，為後續 Agent 提供精確的檢索句。
@@ -69,6 +71,16 @@ LINE 平台不支援 Markdown 渲染，因此所有面向使用者的 Agent Prom
 不適用於：`router.md`（輸出為意圖名稱）、`summarize_messages.md`（內部摘要）、`update_profile.md`（輸出為 Markdown 格式的 user profile）。
 
 作為結尾防線，`graph/nodes.py` 的 `post_process` 節點會透過 `_strip_markdown()` 函數以 regex 清洗殘留的 Markdown 標記，確保最終回覆為純文字。
+
+### 3.5 檢索策略：Agentic Retrieval Strategy
+
+純向量搜尋對專有名詞（品牌名、型號）與長句查詢的命中率偏低，而 LLM 的預設行為是一次搜尋失敗就放棄。為此，我們在 `product_expert`、`troubleshooter`、`youtuber` 三個 Agent Prompt 中加入了 `## 檢索策略 (Agentic Retrieval Strategy)` 區塊，教導 LLM 三項技巧：
+
+1. **拆解關鍵字**：不要把使用者的整句話丟去搜尋，應提煉核心關鍵字。例如 troubleshooter 應提煉為「品牌 + 型號 + 核心症狀」。
+2. **強制多步重試**：第一次 Tool Call 若回傳「查無資料」或內容不相關，必須以不同關鍵字發動第二次、第三次 Tool Call。
+3. **同義詞盲區**：找「權限」找不到就找「管理」；找「加入家人」找不到就找「添加成員」。
+
+> **調校提示**：為新 Agent 撰寫此區塊時，關鍵字拆解範例應貼近該 Agent 的專業領域（如 troubleshooter 著重「症狀描述」、youtuber 著重「UI 文字 / 按鈕名稱」）。`receptionist` 為 tool-less Agent，不適用此策略。
 
 ---
 

@@ -71,6 +71,10 @@ graph TD
             WR_LLM -->|tool_calls| WR_TOOL
             WR_TOOL -->|tool results| WR_LLM
         end
+
+        subgraph receptionist_sub ["receptionist（tool-less）"]
+            RC_LLM["agent_llm<br/><small>無工具，直接回覆</small>"]
+        end
     end
 
     subgraph prompts_store ["System Prompts"]
@@ -81,6 +85,7 @@ graph TD
         prompt_yt[("youtuber.md<br/><small>YouTube教學影片專家</small>")]
         prompt_oc[("order_clerk.md<br/><small>訂單查詢專員</small>")]
         prompt_wr[("web_researcher.md<br/><small>網路搜尋助手</small>")]
+        prompt_rc[("receptionist.md<br/><small>前台接待專員</small>")]
         prompt_merge[("merge_answers.md<br/><small>多回覆合併</small>")]
         prompt_profile[("update_profile.md<br/><small>輪廓更新</small>")]
         prompt_summarize[("summarize_messages.md<br/><small>語意摘要壓縮</small>")]
@@ -114,8 +119,11 @@ graph TD
         pg_facts[("PostgreSQL<br/><small>user_facts 表<br/>SCD Type 2</small>")]
     end
 
-    LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
-    EMBEDDING_ENGINE["Embedding Engine<br/><small>Vertex AI / Ollama<br/>各 [[databases]] 獨立設定</small>"]
+    subgraph ai_engines ["AI 引擎（工廠模式動態載入）"]
+        direction LR
+        LLM_ENGINE["LLM Engine<br/><small>Gemini / Vertex AI / Ollama<br/>config.toml [llm]</small>"]
+        EMBEDDING_ENGINE["Embedding Engine<br/><small>Vertex AI / Ollama<br/>各 [[databases]] 獨立設定</small>"]
+    end
     LINE_USER -->|"傳送訊息"| webhook
     langgraph_reply -->|"合併訊息"| pre_process
     pre_process --> manage_memory
@@ -125,12 +133,14 @@ graph TD
     router -->|"youtube_knowledge"| youtuber_sub
     router -->|"order_status"| order_clerk_sub
     router -->|"web_search"| web_researcher_sub
+    router -->|"general_reception"| receptionist_sub
     router -->|"out_of_domain / transfer_human<br/><small>Router 直接產生 answer</small>"| merge_answers
     product_expert_sub --> merge_answers
     troubleshooter_sub --> merge_answers
     youtuber_sub --> merge_answers
     order_clerk_sub --> merge_answers
     web_researcher_sub --> merge_answers
+    receptionist_sub --> merge_answers
     merge_answers --> update_profile
     update_profile --> post_process
     post_process -->|"answer + response_ui"| langgraph_reply
@@ -143,6 +153,7 @@ graph TD
     prompt_yt --- YT_LLM
     prompt_oc --- OC_LLM
     prompt_wr --- WR_LLM
+    prompt_rc --- RC_LLM
     prompt_merge --- merge_answers
     prompt_profile --- update_profile
     tool_transfer --- router
@@ -178,6 +189,7 @@ graph TD
     LLM_ENGINE -..- YT_LLM
     LLM_ENGINE -..- OC_LLM
     LLM_ENGINE -..- WR_LLM
+    LLM_ENGINE -..- RC_LLM
     LLM_ENGINE -..- merge_answers
     LLM_ENGINE -..- update_profile
     classDef userNode fill:#A5D6A7,stroke:#388E3C,color:#000,stroke-width:2px
@@ -197,11 +209,11 @@ graph TD
     class webhook,buffer debounce
     class pre_process,manage_memory,merge_answers,update_profile,post_process process
     class router router_style
-    class PE_LLM,TS_LLM,YT_LLM,OC_LLM,WR_LLM agent_llm
+    class PE_LLM,TS_LLM,YT_LLM,OC_LLM,WR_LLM,RC_LLM agent_llm
     class PE_TOOL,TS_TOOL,YT_TOOL,OC_TOOL,WR_TOOL agent_tool
     class pgvec_video,pgvec_line_chat,pgvec_youtube,order_api,duckduckgo datastore
     class profile_store,pg_checkpointer,pg_audit,pg_facts persist
     class LLM_ENGINE,EMBEDDING_ENGINE llm_style
-    class prompt_router,prompt_pe,prompt_ts,prompt_yt,prompt_oc,prompt_wr,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
+    class prompt_router,prompt_pe,prompt_ts,prompt_yt,prompt_oc,prompt_wr,prompt_rc,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
     class langgraph_reply debounce
     class tool_video,tool_line_chat,tool_youtube,tool_order,tool_web,tool_transfer tool_style

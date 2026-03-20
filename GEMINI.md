@@ -13,28 +13,39 @@
     - **網路搜尋**: 當內部資料不足時，自動搜尋外部資訊。
     - **使用者輪廓**: 自動從對話中學習並持久化使用者資訊（設備、地址、電話）。
     - **訊息防抖**: 在 LINE 環境下緩衝使用者連續發送的多則短訊息，合併後再處理。
+    - **Agentic RAG (自省式多步檢索)**：Agent 內建檢索策略，搜尋失敗時自動拆解關鍵字、更換同義詞重試，打破純向量搜尋的關鍵字盲區。
+    - **多層漏斗防護 (Multi-layer Fallback)**：Guardrail 敏感詞攔截 → Out of Domain 禮貌拒絕 → Receptionist 一般接待，形成完整防護漏斗。
+    - **設定驅動多模態 UI**：透過 `SupportedUI` 列舉與 `ui_type` 設定，同一 Agent 可產生純文字 (`TEXT`) 或 LINE FlexMessage 影片卡片 (`VIDEO_CARD`)。
 
 ## 系統架構圖 (LangGraph)
 
 ```mermaid
 graph TD
     START((開始)) --> pre_process[預處理/載入輪廓]
-    pre_process --> router{意圖路由}
-    
+    pre_process --> manage_memory[記憶摘要壓縮]
+    manage_memory --> rewrite_query[問題改寫]
+    rewrite_query --> router{意圖路由}
+
     router -- 產品問題 --> product_expert[產品專家 Agent]
     router -- 故障排除 --> troubleshooter[故障排除 Agent]
+    router -- 影片教學 --> youtuber[YouTube影片專家 Agent]
     router -- 訂單查詢 --> order_clerk[訂單專員 Agent]
     router -- 網路搜尋 --> web_researcher[網路搜尋 Agent]
+    router -- 一般接待 --> receptionist[前台接待 Agent]
     router -- 領域外 --> out_of_domain[拒絕回覆]
     router -- 真人客服 --> transfer_human[轉接真人]
-    
-    product_expert --> post_process[後處理/更新輪廓]
-    troubleshooter --> post_process
-    order_clerk --> post_process
-    web_researcher --> post_process
-    out_of_domain --> post_process
-    transfer_human --> post_process
-    
+
+    product_expert --> merge_answers[回覆合併]
+    troubleshooter --> merge_answers
+    youtuber --> merge_answers
+    order_clerk --> merge_answers
+    web_researcher --> merge_answers
+    receptionist --> merge_answers
+    out_of_domain --> merge_answers
+    transfer_human --> merge_answers
+
+    merge_answers --> update_profile[更新輪廓]
+    update_profile --> post_process[後處理]
     post_process --> END((結束))
 ```
 
