@@ -40,7 +40,15 @@ async def pre_process(state: GraphState, config: RunnableConfig):
     # 加入對話摘要（來自 manage_memory 壓縮）
     summary = state.get("summary", "")
     if summary:
-        messages.append(SystemMessage(content=f"[前情提要]\n{summary}"))
+        messages.append(SystemMessage(content=(
+            f"[前情提要]\n{summary}\n\n"
+            "【注意】以上為歷史對話摘要，可能包含多個不同話題。"
+            "請只參考與使用者「當前問題」直接相關的部分，"
+            "忽略不相關的歷史話題，避免將不同主題的資訊混入回答。"
+        )))
+
+    # 加入當前問題
+    messages.append(HumanMessage(content=state["question"]))
 
     return {
         "messages": messages,

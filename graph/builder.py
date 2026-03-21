@@ -49,7 +49,7 @@ async def build_graph():
     # 節點
     workflow.add_node("pre_process", pre_process)
     workflow.add_node("manage_memory", manage_memory)
-    workflow.add_node("rewrite_query", rewrite_query)
+    # workflow.add_node("rewrite_query", rewrite_query)  # 暫時停用
     workflow.add_node("router", router)
     workflow.add_node("merge_answers", merge_answers)
     workflow.add_node("update_profile", update_profile)
@@ -61,8 +61,9 @@ async def build_graph():
     # 連線
     workflow.add_edge(START, "pre_process")
     workflow.add_edge("pre_process", "manage_memory")
-    workflow.add_edge("manage_memory", "rewrite_query")
-    workflow.add_edge("rewrite_query", "router")
+    # workflow.add_edge("manage_memory", "rewrite_query")  # 暫時停用
+    # workflow.add_edge("rewrite_query", "router")        # 暫時停用
+    workflow.add_edge("manage_memory", "router")
 
     # router → 各 agent / merge_answers（透過 Send() fan-out）
     workflow.add_conditional_edges("router", route_by_intent)
