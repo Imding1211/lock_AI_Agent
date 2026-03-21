@@ -21,7 +21,7 @@ class WebSearchRetriever(BaseRetriever):
             results = await asyncio.to_thread(self.search_tool.run, question)
 
             if not results or results.strip() == "":
-                return "網頁搜尋查無相關結果。"
-            return f"來自網頁搜尋的結果：\n{results}"
+                return "查無相關資訊。"
+            return f"{results}"
         except Exception as e:
             return f"網頁搜尋發生錯誤: {e}"

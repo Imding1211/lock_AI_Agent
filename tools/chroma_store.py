@@ -21,4 +21,4 @@ class ChromaRetriever(BaseRetriever):
     async def aretrieve(self, question: str) -> str:
         docs = await self.vector_store.asimilarity_search(question, k=self.top_k)
         context = "\n---\n".join([doc.page_content for doc in docs])
-        return context if context else "此資料庫查無相關文件。"
+        return context if context else "查無相關資訊。"

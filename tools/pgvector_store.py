@@ -75,7 +75,7 @@ class PGVectorRetriever(BaseRetriever):
         )
         context = "\n---\n".join([doc.page_content for doc in docs])
         if not context:
-            return "此資料庫查無相關文件。"
+            return "查無相關資訊。"
 
         # 當 ui_type 非 TEXT 時，在尾部附加 metadata JSON
         ui_type = self.config.get("ui_type", "TEXT")

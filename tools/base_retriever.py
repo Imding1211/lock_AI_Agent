@@ -31,5 +31,5 @@ class BaseRetriever(BaseTool):
             func=_retrieve_sync,
             coroutine=_aretrieve,
             name=name,
-            description=f"搜尋「{description}」資料庫。當使用者的問題與「{description}」相關時使用此工具。",
+            description=f"查詢「{description}」相關資訊。當使用者的問題與「{description}」相關時使用此工具。",
         )
