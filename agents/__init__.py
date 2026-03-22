@@ -75,8 +75,30 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
                 )
                 active_llm = llm_with_tools if has_tool_result else llm_force_tool
 
+            # [DEBUG] agent 送進 LLM 的完整 messages
+            previews = []
+            for m in messages:
+                mt = getattr(m, "type", "unknown")
+                mc = (m.content if hasattr(m, "content") else str(m)).replace("\n", " ")
+                previews.append(f"{mt}:{mc[:20]}")
+            print(f"  [{agent_name}:agent_llm] 送進 {len(messages)} 則: {' | '.join(previews)}")
+
             response = await active_llm.ainvoke(messages)
-            print(f"  [{agent_name}:agent_llm] 回應類型: {'tool_calls' if getattr(response, 'tool_calls', None) else 'text'}")
+
+            # [DEBUG] agent → head：LLM 回傳
+            if getattr(response, "tool_calls", None):
+                tool_names = [tc.get("name", "?") for tc in response.tool_calls]
+                print(f"  [{agent_name}:agent_llm] → head: tool_calls={tool_names}")
+            else:
+                if isinstance(response.content, str):
+                    rc = response.content
+                elif isinstance(response.content, list):
+                    rc = " ".join(p.get("text", "") for p in response.content if isinstance(p, dict) and "text" in p)
+                else:
+                    rc = str(response.content)
+                rc = rc.replace("\n", " ")
+                print(f"  [{agent_name}:agent_llm] → head: text={rc[:20]}")
+
             return {"messages": [response], "history": [f"{agent_name}:agent_llm"]}
 
         tool_node = ToolNode(agent_tools)

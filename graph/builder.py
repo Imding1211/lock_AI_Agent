@@ -32,6 +32,14 @@ async def build_graph():
                 agent_msgs.append(msg)
                 break
 
+        # [DEBUG] head → agent：派發的 messages
+        previews = []
+        for msg in agent_msgs:
+            mt = getattr(msg, "type", "unknown")
+            mc = (msg.content if hasattr(msg, "content") else str(msg)).replace("\n", " ")
+            previews.append(f"{mt}:{mc[:20]}")
+        print(f"  [head→agent] {len(agent_msgs)} 則 → {agents}: {' | '.join(previews)}")
+
         clean = {**state, "history": [], "messages": agent_msgs, "ui_hints": []}
 
         if not agents:

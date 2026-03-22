@@ -11,8 +11,6 @@ warnings.filterwarnings("ignore", message="Your application has authenticated us
 from dotenv import load_dotenv
 load_dotenv()
 
-from graph.builder import build_graph
-from memory import close_checkpointer
 from core.config import USER_PROFILE_CONFIG
 from profiles import ProfileManager, init_facts_db, close_facts_db
 
@@ -170,7 +168,8 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
     raw_history = final.get("history", [])
     current_history = raw_history[prev_len:]
 
-    print(f"[回覆] {final.get('answer', '(無回覆)')}")
+    answer = final.get("answer", "(無回覆)")
+    print(f"[回覆] {answer[:20]}{'...' if len(answer) > 20 else ''}")
 
     try:
         path_tree = format_history_tree(current_history)
@@ -196,7 +195,13 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
 
 if __name__ == "__main__":
     async def main():
+        # 第一步：清除測試資料（在任何初始化之前）
         await clean_test_data()
+        print()
+
+        # 延後 import，避免模組載入時的初始化 print 跑在清除之前
+        from graph.builder import build_graph
+        from memory import close_checkpointer
 
         # 初始化 Facts DB
         if USER_PROFILE_CONFIG.get("facts_enabled", False):
@@ -214,18 +219,18 @@ if __name__ == "__main__":
         await show_user_facts(T)
 
         # --- 第 2 輪：db_video / setup (V-S1) → 累積 messages ---
-        await run_test(app, "Chainlock 怎麼進入設定模式？", thread_id=T, show_memory=True)
+        # await run_test(app, "Chainlock 怎麼進入設定模式？", thread_id=T, show_memory=True)
 
         # --- 第 3 輪：db_line_chat / troubleshoot (L-T2) → 預期觸發 manage_memory:summarized ---
-        await run_test(app, "門把按下去不會彈回來是什麼問題？可以維修嗎？", thread_id=T, show_memory=True)
+        # await run_test(app, "門把按下去不會彈回來是什麼問題？可以維修嗎？", thread_id=T, show_memory=True)
 
         # --- 第 4 輪：db_video / knowledge (V-K3) → 換話題，驗證摘要注入 [前情提要] ---
-        await run_test(app, "推拉式和把手式電子鎖差在哪？", thread_id=T, show_memory=True)
+        # await run_test(app, "推拉式和把手式電子鎖差在哪？", thread_id=T, show_memory=True)
 
         # ============================================================
         # B. db_youtube 專用 thread：驗證 HyDE + Small-to-Big + 時間戳
         # ============================================================
-
+        """
         # --- Y-S3：家庭成員邀請設定 ---
         await run_test(app, "請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？", thread_id="demo_YT", show_memory=True)
 
@@ -271,6 +276,7 @@ if __name__ == "__main__":
             "我要找真人客服，請幫我轉接真人",
             thread_id="demo_human"
         )
+        """
 
         # --- 持久化驗證 ---
         print("=" * 40)

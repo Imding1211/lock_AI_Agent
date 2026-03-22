@@ -358,12 +358,26 @@ async def merge_answers(state: GraphState):
                                 break
                         break
 
+    # 清除 tool 相關的中間訊息，只保留對話脈絡（human / ai 純文字 / system）
+    remove_messages = []
+    for msg in state.get("messages", []):
+        if not (hasattr(msg, "id") and msg.id):
+            continue
+        if hasattr(msg, "type") and msg.type == "tool":
+            remove_messages.append(RemoveMessage(id=msg.id))
+        elif hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
+            remove_messages.append(RemoveMessage(id=msg.id))
+
+    if remove_messages:
+        print(f"  [merge_answers] 清除 {len(remove_messages)} 條 tool 相關訊息")
+
     history_items = ["merge_answers"]
     if topic_resolved:
         history_items.append("topic_resolved")
 
     return {
         "answer": answer,
+        "messages": remove_messages,
         "history": history_items,
     }
 
