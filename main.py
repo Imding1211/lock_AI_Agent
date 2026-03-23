@@ -219,12 +219,12 @@ if __name__ == "__main__":
         # ============================================================
 
         # --- 第 1 輪：db_video / troubleshoot (V-T1) → facts 寫入 device_brand ---
-        await run_test(app, "0922371211", thread_id=T, show_memory=True)
+        await run_test(app, "我家住台北市", thread_id=T, show_memory=True)
         await show_user_facts(T)
-        """
+        
         # --- 第 2 輪：db_video / setup (V-S1) → 累積 messages ---
-        await run_test(app, "Chainlock 怎麼進入設定模式？", thread_id=T, show_memory=True)
-
+        await run_test(app, "我要轉接真人", thread_id=T, show_memory=True)
+        """
         # --- 第 3 輪：db_line_chat / troubleshoot (L-T2) → 預期觸發 manage_memory:summarized ---
         await run_test(app, "門把按下去不會彈回來是什麼問題？可以維修嗎？", thread_id=T, show_memory=True)
 
