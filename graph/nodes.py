@@ -352,11 +352,28 @@ async def merge_answers(state: GraphState):
                 for tc in msg.tool_calls:
                     if tc.get("name") == "transfer_to_human":
                         topic_resolved = True
-                        # 使用 tool 回傳的格式化文字作為 answer
+                        # 將 Agent 的過場語氣與 Tool 回傳的表單合併
+                        agent_apology = ""
+                        form_content = ""
                         for rmsg in reversed(state.get("messages", [])):
-                            if hasattr(rmsg, "type") and rmsg.type == "tool" and rmsg.name == "transfer_to_human":
-                                answer = rmsg.content
+                            if hasattr(rmsg, "type") and rmsg.type == "ai" and getattr(rmsg, "tool_calls", None):
+                                content = rmsg.content
+                                if isinstance(content, list):
+                                    text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+                                    agent_apology = "\n".join(text_parts).strip()
+                                else:
+                                    agent_apology = str(content).strip()
+                            elif hasattr(rmsg, "type") and rmsg.type == "tool" and rmsg.name == "transfer_to_human":
+                                form_content = rmsg.content
+
+                            if agent_apology and form_content:
                                 break
+
+                        # 組合最終回覆：如果有道歉語，就放在表單前面
+                        if agent_apology:
+                            answer = f"{agent_apology}\n\n{form_content}"
+                        else:
+                            answer = form_content
                         break
 
     # 清除 tool 相關的中間訊息，只保留對話脈絡（human / ai 純文字 / system）

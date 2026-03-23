@@ -170,7 +170,8 @@ async def run_test(app, query, thread_id="user_123", show_memory=False):
     current_history = raw_history[prev_len:]
 
     answer = final.get("answer", "(無回覆)")
-    print(f"[回覆] {answer[:20]}{'...' if len(answer) > 20 else ''}")
+    # print(f"[回覆] {answer[:20]}{'...' if len(answer) > 20 else ''}")
+    print(f"[回覆] {answer}")
 
     try:
         path_tree = format_history_tree(current_history)
