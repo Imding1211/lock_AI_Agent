@@ -1,6 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
+from core.debug_log import log_messages as debug_log_messages
 from graph.state import GraphState
 from graph.nodes import (
     pre_process, manage_memory, rewrite_query, router,
@@ -36,9 +37,13 @@ async def build_graph():
         previews = []
         for msg in agent_msgs:
             mt = getattr(msg, "type", "unknown")
-            mc = (msg.content if hasattr(msg, "content") else str(msg)).replace("\n", " ")
+            mc = msg.content if hasattr(msg, "content") else str(msg)
+            if not isinstance(mc, str):
+                mc = str(mc)
+            mc = mc.replace("\n", " ")
             previews.append(f"{mt}:{mc[:20]}")
         print(f"  [head→agent] {len(agent_msgs)} 則 → {agents}: {' | '.join(previews)}")
+        debug_log_messages(f"head → agent ({', '.join(agents)})", agent_msgs)
 
         clean = {**state, "history": [], "messages": agent_msgs, "ui_hints": []}
 

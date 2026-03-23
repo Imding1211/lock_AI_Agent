@@ -6,6 +6,7 @@ from langchain_core.tools import StructuredTool
 from graph.state import GraphState
 from core.config import SYSTEM_CONFIG, REQUIRED_SLOTS
 from tools.pgvector_store import UI_METADATA_DELIMITER
+from core.debug_log import log_messages as debug_log_messages, log_response as debug_log_response, log_tool_results as debug_log_tool_results
 
 
 def load_prompt_template(prompt_file: str, **kwargs) -> str:
@@ -79,9 +80,13 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
             previews = []
             for m in messages:
                 mt = getattr(m, "type", "unknown")
-                mc = (m.content if hasattr(m, "content") else str(m)).replace("\n", " ")
+                mc = m.content if hasattr(m, "content") else str(m)
+                if not isinstance(mc, str):
+                    mc = str(mc)
+                mc = mc.replace("\n", " ")
                 previews.append(f"{mt}:{mc[:20]}")
             print(f"  [{agent_name}:agent_llm] 送進 {len(messages)} 則: {' | '.join(previews)}")
+            debug_log_messages(f"{agent_name}:agent_llm 輸入", messages)
 
             response = await active_llm.ainvoke(messages)
 
@@ -98,6 +103,7 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
                     rc = str(response.content)
                 rc = rc.replace("\n", " ")
                 print(f"  [{agent_name}:agent_llm] → head: text={rc[:20]}")
+            debug_log_response(f"{agent_name}:agent_llm → 回傳", response)
 
             return {"messages": [response], "history": [f"{agent_name}:agent_llm"]}
 
@@ -124,6 +130,8 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
                     ui_hints.append(meta)
                 except json.JSONDecodeError:
                     print(f"  [{agent_name}:tool_node] UI metadata JSON 解析失敗，跳過")
+
+            debug_log_tool_results(f"{agent_name}:tool_node → 結果", result["messages"])
 
             return {
                 "messages": result["messages"],

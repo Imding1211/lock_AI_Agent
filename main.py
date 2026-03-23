@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from core.config import USER_PROFILE_CONFIG
+from core.debug_log import init_debug_log, close_debug_log
 from profiles import ProfileManager, init_facts_db, close_facts_db
 
 
@@ -199,6 +200,9 @@ if __name__ == "__main__":
         await clean_test_data()
         print()
 
+        # 初始化 debug log（記錄 agent/head/tool 訊息流到 temp/）
+        init_debug_log()
+
         # 延後 import，避免模組載入時的初始化 print 跑在清除之前
         from graph.builder import build_graph
         from memory import close_checkpointer
@@ -215,22 +219,22 @@ if __name__ == "__main__":
         # ============================================================
 
         # --- 第 1 輪：db_video / troubleshoot (V-T1) → facts 寫入 device_brand ---
-        await run_test(app, "Dormakaba 鎖舌卡住怎麼處理？", thread_id=T, show_memory=True)
+        await run_test(app, "0922371211", thread_id=T, show_memory=True)
         await show_user_facts(T)
-
+        """
         # --- 第 2 輪：db_video / setup (V-S1) → 累積 messages ---
-        # await run_test(app, "Chainlock 怎麼進入設定模式？", thread_id=T, show_memory=True)
+        await run_test(app, "Chainlock 怎麼進入設定模式？", thread_id=T, show_memory=True)
 
         # --- 第 3 輪：db_line_chat / troubleshoot (L-T2) → 預期觸發 manage_memory:summarized ---
-        # await run_test(app, "門把按下去不會彈回來是什麼問題？可以維修嗎？", thread_id=T, show_memory=True)
+        await run_test(app, "門把按下去不會彈回來是什麼問題？可以維修嗎？", thread_id=T, show_memory=True)
 
         # --- 第 4 輪：db_video / knowledge (V-K3) → 換話題，驗證摘要注入 [前情提要] ---
-        # await run_test(app, "推拉式和把手式電子鎖差在哪？", thread_id=T, show_memory=True)
+        await run_test(app, "推拉式和把手式電子鎖差在哪？", thread_id=T, show_memory=True)
 
         # ============================================================
         # B. db_youtube 專用 thread：驗證 HyDE + Small-to-Big + 時間戳
         # ============================================================
-        """
+        
         # --- Y-S3：家庭成員邀請設定 ---
         await run_test(app, "請問怎麼把我的家人加入 Chatlock AI-99 的 App 裡面讓他也能開門？", thread_id="demo_YT", show_memory=True)
 
@@ -276,8 +280,8 @@ if __name__ == "__main__":
             "我要找真人客服，請幫我轉接真人",
             thread_id="demo_human"
         )
+        
         """
-
         # --- 持久化驗證 ---
         print("=" * 40)
 
@@ -300,6 +304,7 @@ if __name__ == "__main__":
             await show_user_facts(uid)
 
         await asyncio.sleep(0.5)
+        close_debug_log()
         await close_facts_db()
         try:
             await asyncio.wait_for(close_checkpointer(), timeout=10)

@@ -13,6 +13,7 @@ from tools.line_ui_factory import build_line_messages
 from graph.state import GraphState
 from llms import get_llm
 from agents import load_prompt_template
+from core.debug_log import log_final_answer as debug_log_final_answer
 
 llm = get_llm(LLM_CONFIG)
 profile_manager = ProfileManager(USER_PROFILE_CONFIG)
@@ -465,6 +466,7 @@ async def post_process(state: GraphState):
     answer = _strip_markdown(answer)
     ui_hints = state.get("ui_hints", [])
     response_ui = build_line_messages(answer, ui_hints)
+    debug_log_final_answer("head → 使用者（最終回覆）", answer)
     return {
         "answer": answer,
         "response_ui": response_ui,
