@@ -98,8 +98,14 @@ def build_line_messages(answer: str, ui_hints: list) -> list:
 
     # 無有效影片 → 降級純文字
     if not unique_videos:
-        print("  [UI Factory] 回覆類型: TEXT（純文字）")
-        return [TextMessage(text=answer)]
+        # 檢查是否包含特殊的分段標記
+        if "\n===SPLIT_MSG===\n" in answer:
+            parts = answer.split("\n===SPLIT_MSG===\n")
+            print(f"  [UI Factory] 回覆類型: TEXT（分拆為 {len(parts)} 則純文字訊息）")
+            return [TextMessage(text=part.strip()) for part in parts if part.strip()]
+        else:
+            print("  [UI Factory] 回覆類型: TEXT（單則純文字）")
+            return [TextMessage(text=answer)]
 
     # 上限 10 張（LINE Carousel 限制）
     unique_videos = unique_videos[:10]

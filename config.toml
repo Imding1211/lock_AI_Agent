@@ -202,7 +202,7 @@ prompt_file = "agents/prompts/web_researcher.md"
 name        = "receptionist"
 label       = "前台接待專員"
 description = "負責一般問候、感謝、以及接收使用者更新個人資料等不需查閱知識庫的對話"
-tools       = []
+tools       = ["transfer_to_human"]
 prompt_file = "agents/prompts/receptionist.md"
 
 # -----未來擴充-----
@@ -272,7 +272,7 @@ require_slots = false
 name          = "transfer_human"
 label         = "轉接真人客服"
 description   = "使用者明確且堅持要求轉接真人客服，或涉及任何金錢相關話題（報價、費用、預算、分期、退款、付款方式等）。"
-target        = "human"
+target        = "receptionist"
 require_slots = false
 
 # -----未來擴充-----
@@ -293,6 +293,8 @@ postgres_uri_env       = "POSTGRES_URI"       # PostgreSQL 連線字串
 # sqlite_path          = "./data/db/chat_history.db"  # sqlite 專用，回退時取消註解
 max_messages_threshold = 50                   # messages 超過此數量時觸發語意摘要壓縮
 context_retention_pair = 20                   # 壓縮後保留最近幾對對話（1 對 = 1 human + 1 ai）
+router_context_pairs   = 3                    # router 意圖分類時，附帶最近幾輪對話作為上下文
+agent_context_pairs    = 2                    # agent 派發時，附帶最近幾輪對話（讓 agent 能延續話題）
 
 
 # ==========================================

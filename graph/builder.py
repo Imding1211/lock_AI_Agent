@@ -6,7 +6,7 @@ from graph.state import GraphState
 from graph.nodes import (
     pre_process, manage_memory, rewrite_query, router,
     merge_answers, update_profile, post_process,
-    llm as base_llm
+    llm as base_llm, _extract_recent_pairs
 )
 from memory import get_checkpointer
 from tools import build_tools, UI_TYPE_MAP
@@ -22,16 +22,22 @@ async def build_graph():
     def route_by_intent(state: GraphState):
         agents = state.get("next_agents", [])
 
-        # 只保留 summary (SystemMessage) + 當前問題 (最後一個 HumanMessage)
-        # 避免舊對話的 AI 回覆影響 agent 決策 & merge_answers 計數
+        # summary (SystemMessage) + 近 N 輪對話（含當前 question）
+        agent_context_pairs = MEMORY_CONFIG.get("agent_context_pairs", 2)
         agent_msgs = []
         for msg in state.get("messages", []):
             if hasattr(msg, "type") and msg.type == "system":
                 agent_msgs.append(msg)
-        for msg in reversed(state.get("messages", [])):
-            if hasattr(msg, "type") and msg.type == "human":
-                agent_msgs.append(msg)
-                break
+        recent = _extract_recent_pairs(
+            state.get("messages", []), agent_context_pairs, skip_latest_human=False
+        )
+        agent_msgs.extend(recent)
+        # 確保最後一則是當前 HumanMessage（若 recent 已含則不重複）
+        if not agent_msgs or agent_msgs[-1].type != "human":
+            for msg in reversed(state.get("messages", [])):
+                if hasattr(msg, "type") and msg.type == "human":
+                    agent_msgs.append(msg)
+                    break
 
         # [DEBUG] head → agent：派發的 messages
         previews = []

@@ -8,7 +8,6 @@ from core.config import (
     PROMPTS_CONFIG, TEMPLATES_CONFIG,
 )
 from profiles import ProfileManager
-from tools.transfer_human import TransferHumanTool
 from tools.line_ui_factory import build_line_messages
 from graph.state import GraphState
 from llms import get_llm
@@ -17,7 +16,6 @@ from core.debug_log import log_final_answer as debug_log_final_answer
 
 llm = get_llm(LLM_CONFIG)
 profile_manager = ProfileManager(USER_PROFILE_CONFIG)
-_transfer_tool = TransferHumanTool({})
 
 
 async def pre_process(state: GraphState, config: RunnableConfig):
@@ -164,6 +162,29 @@ async def rewrite_query(state: GraphState, config: RunnableConfig):
     }
 
 
+def _extract_recent_pairs(messages: list, max_pairs: int, skip_latest_human: bool = False) -> list:
+    """從 messages 中取出最近 N 輪 human+AI 對話（過濾掉 tool 相關訊息）。
+
+    Args:
+        messages: state["messages"]
+        max_pairs: 要保留幾輪（1 輪 = 1 human + 1 ai）
+        skip_latest_human: True 時跳過最新的 HumanMessage（router 用，因為 question 另外加）
+    """
+    conversation = []
+    for msg in messages:
+        if not hasattr(msg, "type"):
+            continue
+        if msg.type == "human":
+            conversation.append(msg)
+        elif msg.type == "ai" and msg.content and not getattr(msg, "tool_calls", None):
+            conversation.append(msg)
+
+    if skip_latest_human and conversation and conversation[-1].type == "human":
+        conversation = conversation[:-1]
+
+    return conversation[-(max_pairs * 2):]
+
+
 async def router(state: GraphState, config: RunnableConfig):
     """用 LLM 做意圖分類，回傳 next_agents（支援多意圖）"""
     print("  [router] 正在分類意圖...")
@@ -194,20 +215,22 @@ async def router(state: GraphState, config: RunnableConfig):
     if sensitive_keywords:
         for kw in sensitive_keywords:
             if kw in question:
-                print(f"  [Guardrail] 偵測到敏感詞彙「{kw}」，強制轉接真人")
-                cfg = config.get("configurable", {})
-                user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
-                answer = await _transfer_tool.generate_form(user_id, extra_text=question)
+                print(f"  [Guardrail] 偵測到敏感詞彙「{kw}」，轉交 receptionist 處理")
                 return {
-                    "answer": answer,
-                    "next_agents": [],
-                    "history": ["guardrail_triggered", "topic_resolved"],
+                    "next_agents": ["receptionist"],
+                    "history": ["guardrail_triggered"],
                 }
 
-    response = await llm.ainvoke([
-        SystemMessage(content=router_prompt),
-        HumanMessage(content=question),
-    ])
+    router_context_pairs = MEMORY_CONFIG.get("router_context_pairs", 3)
+    recent_context = _extract_recent_pairs(
+        state.get("messages", []), router_context_pairs, skip_latest_human=True
+    )
+
+    router_messages = [SystemMessage(content=router_prompt)]
+    router_messages.extend(recent_context)
+    router_messages.append(HumanMessage(content=question))
+
+    response = await llm.ainvoke(router_messages)
 
     # 解析 LLM 回覆（可能含多行意圖名稱）
     raw = response.content.strip()
@@ -239,21 +262,9 @@ async def router(state: GraphState, config: RunnableConfig):
         targets = ["product_expert"]
         print("  [router] 無有效意圖，fallback 到 product_expert")
 
-    # out_of_domain / human 不與其他意圖混合
-    if "out_of_domain" in targets or "human" in targets:
-        targets = [targets[0]]
-
-    # transfer_human：由 router 直接產生轉接表單
-    if targets == ["human"]:
-        print("  [router] 直接處理 transfer_human...")
-        cfg = config.get("configurable", {})
-        user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
-        answer = await _transfer_tool.generate_form(user_id, extra_text=question)
-        return {
-            "answer": answer,
-            "next_agents": [],
-            "history": ["router:transfer_human", "topic_resolved"],
-        }
+    # out_of_domain 不與其他意圖混合
+    if "out_of_domain" in targets:
+        targets = ["out_of_domain"]
 
     # out_of_domain：由 router 直接產生禮貌拒絕
     if targets == ["out_of_domain"]:
@@ -340,41 +351,39 @@ async def merge_answers(state: GraphState):
 
     print(f"  [merge_answers] 最終回覆: {answer[:10]}...")
 
-    # 判斷是否為轉接真人（檢查 history 和 tool 呼叫）
+    # 判斷是否為轉接真人（掃描當前 messages 中的 tool 呼叫）
     topic_resolved = False
-    if "topic_resolved" in state.get("history", []):
-        topic_resolved = True
+    for msg in state.get("messages", []):
+        if hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
+            for tc in msg.tool_calls:
+                if tc.get("name") == "transfer_to_human":
+                    topic_resolved = True
+                    # 將 Agent 的過場語氣與 Tool 回傳的表單合併
+                    # Gemini 會將 tool_calls 和文字回覆分開為兩個 AI message：
+                    #   AI(tool_calls, 無文字) → Tool(表單) → AI(道歉語)
+                    # 因此道歉語要從「最後一個無 tool_calls 的 AI message」取得
+                    agent_apology = ""
+                    form_content = ""
+                    for rmsg in reversed(state.get("messages", [])):
+                        if not form_content and hasattr(rmsg, "type") and rmsg.type == "tool" and rmsg.name == "transfer_to_human":
+                            form_content = rmsg.content
+                        elif not agent_apology and hasattr(rmsg, "type") and rmsg.type == "ai" and not getattr(rmsg, "tool_calls", None) and rmsg.content:
+                            content = rmsg.content
+                            if isinstance(content, list):
+                                text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
+                                agent_apology = "\n".join(text_parts).strip()
+                            else:
+                                agent_apology = str(content).strip()
 
-    # 也檢查 tool 呼叫歷史
-    if not topic_resolved:
-        for msg in state.get("messages", []):
-            if hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
-                for tc in msg.tool_calls:
-                    if tc.get("name") == "transfer_to_human":
-                        topic_resolved = True
-                        # 將 Agent 的過場語氣與 Tool 回傳的表單合併
-                        agent_apology = ""
-                        form_content = ""
-                        for rmsg in reversed(state.get("messages", [])):
-                            if hasattr(rmsg, "type") and rmsg.type == "ai" and getattr(rmsg, "tool_calls", None):
-                                content = rmsg.content
-                                if isinstance(content, list):
-                                    text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
-                                    agent_apology = "\n".join(text_parts).strip()
-                                else:
-                                    agent_apology = str(content).strip()
-                            elif hasattr(rmsg, "type") and rmsg.type == "tool" and rmsg.name == "transfer_to_human":
-                                form_content = rmsg.content
+                        if agent_apology and form_content:
+                            break
 
-                            if agent_apology and form_content:
-                                break
-
-                        # 組合最終回覆：如果有道歉語，就放在表單前面
-                        if agent_apology:
-                            answer = f"{agent_apology}\n\n{form_content}"
-                        else:
-                            answer = form_content
-                        break
+                    # 組合最終回覆：道歉語 + 分隔符 + 表單
+                    if agent_apology and form_content:
+                        answer = f"{agent_apology}\n===SPLIT_MSG===\n{form_content}"
+                    elif form_content:
+                        answer = form_content
+                    break
 
     # 清除 tool 相關的中間訊息，只保留對話脈絡（human / ai 純文字 / system）
     remove_messages = []
