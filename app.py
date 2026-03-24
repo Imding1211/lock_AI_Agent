@@ -14,6 +14,8 @@ from storage import get_storage, close_storage
 from memory import close_checkpointer
 from profiles import init_facts_db, close_facts_db
 
+from tools.transfer_human import TransferHumanTool
+
 import core.line_bot as line_bot
 import core.debounce as debounce
 
@@ -29,6 +31,10 @@ parser = WebhookParser(LINE_CHANNEL_SECRET)
 
 # 審計日誌（在 startup 事件中非同步初始化）
 audit_storage = None
+
+# 轉接真人表單工具（非文字訊息直接回覆用）
+transfer_tool = TransferHumanTool({})
+transfer_tool.setup()
 
 @app.on_event("startup")
 async def startup_event():
@@ -62,13 +68,28 @@ async def line_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature. Check your channel secret.")
 
     for event in events:
-        # 我們目前只處理文字訊息
-        if not isinstance(event, MessageEvent) or not isinstance(event.message, TextMessageContent):
+        if not isinstance(event, MessageEvent):
             continue
 
         user_id = event.source.user_id
+        reply_token = event.reply_token
+
+        # 非文字訊息 → 直接回覆轉接表單，不進 LangGraph
+        if not isinstance(event.message, TextMessageContent):
+            print(f"[收到非文字訊息] user={user_id}")
+            form_reply = await transfer_tool.generate_form(user_id)
+            if audit_storage:
+                try:
+                    await audit_storage.log_message(user_id, "user_raw", "[非文字訊息]")
+                    await audit_storage.log_message(user_id, "ai", form_reply)
+                except Exception as e:
+                    print(f"[Audit] 記錄失敗: {e}")
+            await line_bot.send_response(user_id, reply_token, form_reply)
+            continue
+
+        # 以下為文字訊息處理流程
         new_text = event.message.text
-        new_token = event.reply_token
+        new_token = reply_token
 
         print(f"[收到訊息] '{new_text}' (Token: {new_token})")
 

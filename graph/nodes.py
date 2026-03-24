@@ -182,6 +182,11 @@ def _extract_recent_pairs(messages: list, max_pairs: int, skip_latest_human: boo
     if skip_latest_human and conversation and conversation[-1].type == "human":
         conversation = conversation[:-1]
 
+    # 移除尾端未配對的 HumanMessage（前一輪的 AI 回覆被清除時會產生）
+    # 避免 orphaned human messages 污染 router 上下文
+    while conversation and conversation[-1].type == "human":
+        conversation.pop()
+
     return conversation[-(max_pairs * 2):]
 
 
@@ -388,7 +393,7 @@ async def merge_answers(state: GraphState):
                     for rmsg in reversed(state.get("messages", [])):
                         if not form_content and hasattr(rmsg, "type") and rmsg.type == "tool" and rmsg.name == "transfer_to_human":
                             form_content = rmsg.content
-                        elif not agent_apology and hasattr(rmsg, "type") and rmsg.type == "ai" and not getattr(rmsg, "tool_calls", None) and rmsg.content:
+                        elif not agent_apology and hasattr(rmsg, "type") and rmsg.type == "ai" and rmsg.content:
                             content = rmsg.content
                             if isinstance(content, list):
                                 text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
@@ -415,6 +420,23 @@ async def merge_answers(state: GraphState):
             remove_messages.append(RemoveMessage(id=msg.id))
         elif hasattr(msg, "type") and msg.type == "ai" and getattr(msg, "tool_calls", None):
             remove_messages.append(RemoveMessage(id=msg.id))
+
+    # 轉接完成時，也清除 agent 的純文字 AI 回覆（道歉語）
+    # 這些訊息的內容已擷取到 answer，留在歷史中會讓 router 誤判後續意圖
+    if topic_resolved:
+        msgs = state.get("messages", [])
+        already_removing = {rm.id for rm in remove_messages}
+        # 找最後一個 HumanMessage 的位置，其後的 AI 訊息都是本輪 agent 產出
+        last_human_idx = -1
+        for i, msg in enumerate(msgs):
+            if hasattr(msg, "type") and msg.type == "human":
+                last_human_idx = i
+        if last_human_idx >= 0:
+            for msg in msgs[last_human_idx + 1:]:
+                if (hasattr(msg, "id") and msg.id
+                        and msg.id not in already_removing
+                        and hasattr(msg, "type") and msg.type == "ai"):
+                    remove_messages.append(RemoveMessage(id=msg.id))
 
     if remove_messages:
         print(f"  [merge_answers] 清除 {len(remove_messages)} 條 tool 相關訊息")

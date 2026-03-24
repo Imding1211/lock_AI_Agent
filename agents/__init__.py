@@ -2,6 +2,7 @@ import json
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import StructuredTool
 from graph.state import GraphState
 from core.config import SYSTEM_CONFIG, REQUIRED_SLOTS
@@ -37,10 +38,14 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
     # 收集此 agent 使用的工具
     agent_tools = [tools_dict[name] for name in tool_names if name in tools_dict]
 
+    # 判斷是否有 retriever 工具（db_* 開頭）
+    has_retriever = any(name.startswith("db_") for name in tool_names)
+
     # 綁定工具到 LLM（無工具時跳過綁定）
     if agent_tools:
         llm_with_tools = llm.bind_tools(agent_tools)
-        llm_force_tool = llm.bind_tools(agent_tools, tool_choice="any")
+        # 只在有 retriever 時才強制首次使用工具
+        llm_force_tool = llm.bind_tools(agent_tools, tool_choice="any") if has_retriever else llm_with_tools
     else:
         llm_with_tools = llm
         llm_force_tool = llm
@@ -109,8 +114,19 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
 
         tool_node = ToolNode(agent_tools)
 
-        async def execute_tools(state: GraphState):
+        async def execute_tools(state: GraphState, config: RunnableConfig):
             print(f"  [{agent_name}:tool_node] 正在執行工具呼叫...")
+
+            # 注入正確 user_id 到 transfer_to_human 呼叫
+            cfg = config.get("configurable", {})
+            real_user_id = cfg.get("user_id") or cfg.get("thread_id", "anonymous")
+            last_msg = state["messages"][-1]
+            if getattr(last_msg, "tool_calls", None):
+                for tc in last_msg.tool_calls:
+                    if tc.get("name") == "transfer_to_human":
+                        tc["args"]["user_id"] = real_user_id
+                        print(f"  [{agent_name}:tool_node] 注入 user_id={real_user_id}")
+
             result = await tool_node.ainvoke(state)
 
             # 攔截 metadata：從 ToolMessage 中剝離 UI_METADATA，寫入 ui_hints
@@ -155,7 +171,18 @@ def build_agent_executor(agent_config: dict, tools_dict: dict[str, StructuredToo
             should_continue,
             {"tools": "tools", END: END}
         )
-        workflow.add_edge("tools", "agent_llm")
+        def should_continue_after_tools(state: GraphState):
+            """工具執行後：transfer_to_human → 結束；其他 → 回 LLM"""
+            last_message = state["messages"][-1]
+            if hasattr(last_message, "name") and last_message.name == "transfer_to_human":
+                return END
+            return "agent_llm"
+
+        workflow.add_conditional_edges(
+            "tools",
+            should_continue_after_tools,
+            {"agent_llm": "agent_llm", END: END}
+        )
 
         return workflow.compile()
 
