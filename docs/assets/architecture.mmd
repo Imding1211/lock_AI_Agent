@@ -32,36 +32,44 @@ graph TD
     end
 
     subgraph agents_layer ["Agent 子圖（Send fan-out 平行派發 + ui_hints 攔截）"]
-        subgraph product_expert_sub ["product_expert"]
+        subgraph hardware_technician_sub ["hardware_technician"]
             direction LR
-            PE_LLM["agent_llm"]
-            PE_TOOL["tool_node"]
-            PE_LLM -->|tool_calls| PE_TOOL
-            PE_TOOL -->|tool results| PE_LLM
+            HT_LLM["agent_llm"]
+            HT_TOOL["tool_node"]
+            HT_LLM -->|tool_calls| HT_TOOL
+            HT_TOOL -->|tool results| HT_LLM
         end
 
-        subgraph troubleshooter_sub ["troubleshooter"]
+        subgraph sales_representative_sub ["sales_representative"]
             direction LR
-            TS_LLM["agent_llm"]
-            TS_TOOL["tool_node"]
-            TS_LLM -->|tool_calls| TS_TOOL
-            TS_TOOL -->|tool results| TS_LLM
+            SR_LLM["agent_llm"]
+            SR_TOOL["tool_node"]
+            SR_LLM -->|tool_calls| SR_TOOL
+            SR_TOOL -->|tool results| SR_LLM
         end
 
-        subgraph youtuber_sub ["youtuber"]
+        subgraph store_assistant_sub ["store_assistant"]
             direction LR
-            YT_LLM["agent_llm"]
-            YT_TOOL["tool_node<br/><small>攔截 UI metadata<br/>→ ui_hints</small>"]
-            YT_LLM -->|tool_calls| YT_TOOL
-            YT_TOOL -->|tool results| YT_LLM
+            SA_LLM["agent_llm"]
+            SA_TOOL["tool_node"]
+            SA_LLM -->|tool_calls| SA_TOOL
+            SA_TOOL -->|tool results| SA_LLM
         end
 
-        subgraph order_clerk_sub ["order_clerk"]
+        subgraph app_specialist_sub ["app_specialist"]
             direction LR
-            OC_LLM["agent_llm"]
-            OC_TOOL["tool_node"]
-            OC_LLM -->|tool_calls| OC_TOOL
-            OC_TOOL -->|tool results| OC_LLM
+            AS_LLM["agent_llm"]
+            AS_TOOL["tool_node<br/><small>攔截 UI metadata<br/>→ ui_hints (VIDEO_CARD)</small>"]
+            AS_LLM -->|tool_calls| AS_TOOL
+            AS_TOOL -->|tool results| AS_LLM
+        end
+
+        subgraph manual_librarian_sub ["manual_librarian"]
+            direction LR
+            ML_LLM["agent_llm"]
+            ML_TOOL["tool_node<br/><small>攔截 UI metadata<br/>→ ui_hints (DOWNLOAD_CARD)</small>"]
+            ML_LLM -->|tool_calls| ML_TOOL
+            ML_TOOL -->|tool results| ML_LLM
         end
 
         subgraph web_researcher_sub ["web_researcher"]
@@ -80,10 +88,11 @@ graph TD
     subgraph prompts_store ["System Prompts"]
         direction LR
         prompt_router[("router.md<br/><small>意圖分類器</small>")]
-        prompt_pe[("product_expert.md<br/><small>產品規格專家</small>")]
-        prompt_ts[("troubleshooter.md<br/><small>故障排除專家</small>")]
-        prompt_yt[("youtuber.md<br/><small>YouTube教學影片專家</small>")]
-        prompt_oc[("order_clerk.md<br/><small>訂單查詢專員</small>")]
+        prompt_ht[("hardware_technician.md<br/><small>硬體維修技師</small>")]
+        prompt_sr[("sales_representative.md<br/><small>報價與客服專員</small>")]
+        prompt_sa[("store_assistant.md<br/><small>門市與規格助理</small>")]
+        prompt_as[("app_specialist.md<br/><small>APP 設定專家</small>")]
+        prompt_ml[("manual_librarian.md<br/><small>說明書管理員</small>")]
         prompt_wr[("web_researcher.md<br/><small>網路搜尋助手</small>")]
         prompt_rc[("receptionist.md<br/><small>前台接待專員</small>")]
         prompt_merge[("merge_answers.md<br/><small>多回覆合併</small>")]
@@ -94,9 +103,11 @@ graph TD
 
     subgraph tools_store ["Tools（UI_TYPE_MAP 驅動 ui_type）"]
         direction LR
-        tool_video[("db_video<br/><small>訓練影片知識庫<br/>安裝、故障排除、客服 SOP</small>")]
-        tool_line_chat[("db_line_chat<br/><small>LINE 客服對話知識庫<br/>真實客戶問答紀錄</small>")]
-        tool_youtube[("db_youtube<br/><small>YouTube 教學影片知識庫<br/>ui_type=VIDEO_CARD</small>")]
+        tool_video[("db_video<br/><small>核心技術與維修知識庫</small>")]
+        tool_line_chat[("db_line_chat<br/><small>客服實務與報價知識庫</small>")]
+        tool_website[("db_website<br/><small>營業資訊與產品規格知識庫</small>")]
+        tool_youtube[("db_youtube<br/><small>APP 操作教學影片知識庫<br/>ui_type=VIDEO_CARD</small>")]
+        tool_manuals[("db_manuals<br/><small>說明書 PDF 下載連結<br/>ui_type=DOWNLOAD_CARD</small>")]
         tool_order[("db_order_api<br/><small>查詢即時訂單狀態與報修進度</small>")]
         tool_web[("db_web_search<br/><small>網際網路搜尋引擎</small>")]
         tool_transfer[("transfer_to_human<br/><small>轉接真人客服</small>")]
@@ -106,7 +117,9 @@ graph TD
         direction LR
         pgvec_video[("pgvector<br/><small>kb_video</small>")]
         pgvec_line_chat[("pgvector<br/><small>kb_line_chat</small>")]
+        pgvec_website[("pgvector<br/><small>kb_website</small>")]
         pgvec_youtube[("pgvector<br/><small>kb_youtube</small>")]
+        pgvec_gdrive[("pgvector<br/><small>kb_gdrive</small>")]
         order_api[("Order API<br/><small>訂單 / 維修單</small>")]
         duckduckgo[("DuckDuckGo<br/><small>網頁搜尋</small>")]
     end
@@ -128,17 +141,19 @@ graph TD
     langgraph_reply -->|"合併訊息"| pre_process
     pre_process --> manage_memory
     manage_memory --> router
-    router -->|"general_knowledge"| product_expert_sub
-    router -->|"troubleshooting"| troubleshooter_sub
-    router -->|"youtube_knowledge"| youtuber_sub
-    router -->|"order_status"| order_clerk_sub
+    router -->|"hardware_tech"| hardware_technician_sub
+    router -->|"sales_and_service"| sales_representative_sub
+    router -->|"store_info"| store_assistant_sub
+    router -->|"app_support"| app_specialist_sub
+    router -->|"manual_request"| manual_librarian_sub
     router -->|"web_search"| web_researcher_sub
     router -->|"general_reception"| receptionist_sub
     router -->|"out_of_domain / transfer_human<br/><small>Router 直接產生 answer</small>"| merge_answers
-    product_expert_sub --> merge_answers
-    troubleshooter_sub --> merge_answers
-    youtuber_sub --> merge_answers
-    order_clerk_sub --> merge_answers
+    hardware_technician_sub --> merge_answers
+    sales_representative_sub --> merge_answers
+    store_assistant_sub --> merge_answers
+    app_specialist_sub --> merge_answers
+    manual_librarian_sub --> merge_answers
     web_researcher_sub --> merge_answers
     receptionist_sub --> merge_answers
     merge_answers --> update_profile
@@ -148,28 +163,33 @@ graph TD
     prompt_transfer --- router
     prompt_summarize --- manage_memory
     prompt_router --- router
-    prompt_pe --- PE_LLM
-    prompt_ts --- TS_LLM
-    prompt_yt --- YT_LLM
-    prompt_oc --- OC_LLM
+    prompt_ht --- HT_LLM
+    prompt_sr --- SR_LLM
+    prompt_sa --- SA_LLM
+    prompt_as --- AS_LLM
+    prompt_ml --- ML_LLM
     prompt_wr --- WR_LLM
     prompt_rc --- RC_LLM
     prompt_merge --- merge_answers
     prompt_profile --- update_profile
     tool_transfer --- router
-    tool_video --- PE_TOOL
-    tool_transfer --- PE_TOOL
-    tool_line_chat --- TS_TOOL
-    tool_transfer --- TS_TOOL
-    tool_youtube --- YT_TOOL
-    tool_transfer --- YT_TOOL
-    tool_order --- OC_TOOL
-    tool_transfer --- OC_TOOL
+    tool_video --- HT_TOOL
+    tool_transfer --- HT_TOOL
+    tool_line_chat --- SR_TOOL
+    tool_transfer --- SR_TOOL
+    tool_website --- SA_TOOL
+    tool_transfer --- SA_TOOL
+    tool_youtube --- AS_TOOL
+    tool_transfer --- AS_TOOL
+    tool_manuals --- ML_TOOL
+    tool_transfer --- ML_TOOL
     tool_web --- WR_TOOL
     tool_transfer --- WR_TOOL
     tool_video --- pgvec_video
     tool_line_chat --- pgvec_line_chat
+    tool_website --- pgvec_website
     tool_youtube --- pgvec_youtube
+    tool_manuals --- pgvec_gdrive
     tool_order --- order_api
     tool_web --- duckduckgo
     pre_process -.->|"載入"| profile_store
@@ -181,13 +201,16 @@ graph TD
     langgraph_reply -.->|"user + ai"| pg_audit
     EMBEDDING_ENGINE -..- pgvec_video
     EMBEDDING_ENGINE -..- pgvec_line_chat
+    EMBEDDING_ENGINE -..- pgvec_website
     EMBEDDING_ENGINE -..- pgvec_youtube
+    EMBEDDING_ENGINE -..- pgvec_gdrive
     LLM_ENGINE -..- manage_memory
     LLM_ENGINE -..- router
-    LLM_ENGINE -..- PE_LLM
-    LLM_ENGINE -..- TS_LLM
-    LLM_ENGINE -..- YT_LLM
-    LLM_ENGINE -..- OC_LLM
+    LLM_ENGINE -..- HT_LLM
+    LLM_ENGINE -..- SR_LLM
+    LLM_ENGINE -..- SA_LLM
+    LLM_ENGINE -..- AS_LLM
+    LLM_ENGINE -..- ML_LLM
     LLM_ENGINE -..- WR_LLM
     LLM_ENGINE -..- RC_LLM
     LLM_ENGINE -..- merge_answers
@@ -209,11 +232,11 @@ graph TD
     class webhook,buffer debounce
     class pre_process,manage_memory,merge_answers,update_profile,post_process process
     class router router_style
-    class PE_LLM,TS_LLM,YT_LLM,OC_LLM,WR_LLM,RC_LLM agent_llm
-    class PE_TOOL,TS_TOOL,YT_TOOL,OC_TOOL,WR_TOOL agent_tool
-    class pgvec_video,pgvec_line_chat,pgvec_youtube,order_api,duckduckgo datastore
+    class HT_LLM,SR_LLM,SA_LLM,AS_LLM,ML_LLM,WR_LLM,RC_LLM agent_llm
+    class HT_TOOL,SR_TOOL,SA_TOOL,AS_TOOL,ML_TOOL,WR_TOOL agent_tool
+    class pgvec_video,pgvec_line_chat,pgvec_website,pgvec_youtube,pgvec_gdrive,order_api,duckduckgo datastore
     class profile_store,pg_checkpointer,pg_audit,pg_facts persist
     class LLM_ENGINE,EMBEDDING_ENGINE llm_style
-    class prompt_router,prompt_pe,prompt_ts,prompt_yt,prompt_oc,prompt_wr,prompt_rc,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
+    class prompt_router,prompt_ht,prompt_sr,prompt_sa,prompt_as,prompt_ml,prompt_wr,prompt_rc,prompt_merge,prompt_profile,prompt_summarize,prompt_transfer prompt_style
     class langgraph_reply debounce
-    class tool_video,tool_line_chat,tool_youtube,tool_order,tool_web,tool_transfer tool_style
+    class tool_video,tool_line_chat,tool_website,tool_youtube,tool_manuals,tool_order,tool_web,tool_transfer tool_style

@@ -61,6 +61,69 @@ def _build_video_bubble_dict(title: str, url: str, thumbnail: str) -> dict:
     }
 
 
+def _build_download_bubble_dict(title: str, url: str, filename: str) -> dict:
+    """建構單張下載按鈕 Bubble 的 dict"""
+    return {
+        "type": "bubble",
+        "size": "kilo",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📄 官方說明書",
+                    "weight": "bold",
+                    "color": "#1DB446",
+                    "size": "sm"
+                },
+                {
+                    "type": "text",
+                    "text": title,
+                    "weight": "bold",
+                    "size": "xl",
+                    "margin": "md",
+                    "wrap": True
+                },
+                {
+                    "type": "text",
+                    "text": f"📎 {filename}",
+                    "size": "xs",
+                    "color": "#aaaaaa",
+                    "wrap": True,
+                    "margin": "sm"
+                },
+                {
+                    "type": "text",
+                    "text": "點擊下方按鈕即可開啟或下載 PDF 檔案",
+                    "size": "xs",
+                    "color": "#aaaaaa",
+                    "wrap": True,
+                    "margin": "sm"
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "height": "sm",
+                    "action": {
+                        "type": "uri",
+                        "label": "📥 立即下載",
+                        "uri": url
+                    }
+                }
+            ],
+            "flex": 0
+        }
+    }
+
+
 def build_line_messages(answer: str, ui_hints: list) -> list:
     """
     將 answer + ui_hints 轉換為 LINE Message 物件列表。
@@ -68,6 +131,32 @@ def build_line_messages(answer: str, ui_hints: list) -> list:
     ui_hints 格式範例:
     [{"ui_type": "VIDEO_CARD", "items": [{"source": "https://...", "title": "..."}]}]
     """
+    # --- 處理 DOWNLOAD_CARD ---
+    download_items = []
+    for hint in ui_hints:
+        if hint.get("ui_type") == "DOWNLOAD_CARD":
+            for item in hint.get("items", []):
+                if item.get("url") and item not in download_items:
+                    download_items.append(item)
+
+    if download_items:
+        download_items = download_items[:10]
+        bubbles = []
+        for item in download_items:
+            model = item.get("model", "")
+            title = item.get("title") or (f"{model} 說明書" if model else "說明書檔案")
+            filename = f"{model} 說明書.pdf" if model else "說明書.pdf"
+            bubbles.append(_build_download_bubble_dict(title, item.get("url"), filename))
+
+        contents_dict = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
+        flex_msg = FlexMessage.from_dict({
+            "type": "flex",
+            "altText": "說明書下載連結",
+            "contents": contents_dict,
+        })
+        print(f"  [UI Factory] 回覆類型: DOWNLOAD_CARD（{len(bubbles)} 張卡片）")
+        return [TextMessage(text=answer), flex_msg]
+
     # 收集所有 VIDEO_CARD items
     video_items = []
     for hint in ui_hints:

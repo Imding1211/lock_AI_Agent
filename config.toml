@@ -138,6 +138,20 @@ embedding_location_env   = "VERTEX_LOCATION"
 embedding_dimensions     = 768
 
 [[databases]]
+name               = "db_manuals"
+type               = "pgvector"
+description        = "各型號電子鎖的 PDF 說明書與下載連結"
+collection_name    = "kb_gdrive"
+connection_uri_env = "PG_VECTOR_URI"
+top_k              = 3
+ui_type            = "DOWNLOAD_CARD"
+embedding_provider       = "vertexai"
+embedding_model          = "text-embedding-004"
+embedding_project_id_env = "VERTEX_PROJECT_ID"
+embedding_location_env   = "VERTEX_LOCATION"
+embedding_dimensions     = 768
+
+[[databases]]
 name        = "db_order_api"
 type        = "api"
 description = "查詢即時訂單狀態與報修進度"
@@ -189,6 +203,13 @@ label       = "APP 設定專家"
 description = "負責回答 Chatlock AI-99 等智慧鎖 APP 的操作步驟、解除綁定、邀請成員等軟體問題"
 tools       = ["db_youtube", "transfer_to_human"]
 prompt_file = "agents/prompts/app_specialist.md"
+
+[[agents]]
+name        = "manual_librarian"
+label       = "說明書管理員"
+description = "負責提供各型號電子鎖的官方說明書 PDF 下載連結"
+tools       = ["db_manuals", "transfer_to_human"]
+prompt_file = "agents/prompts/manual_librarian.md"
 
 # -----基本Agent-----
 [[agents]]
@@ -245,6 +266,13 @@ name          = "app_support"
 label         = "APP 操作與設定"
 description   = "使用者詢問智慧鎖 APP（如 Chatlock AI-99）的操作步驟、解除綁定、邀請家人、權限設定、或清理緩存等軟體問題"
 target        = "app_specialist"
+require_slots = false
+
+[[intents]]
+name          = "manual_request"
+label         = "索取說明書"
+description   = "使用者要求索取、下載、查看電子鎖的說明書、手冊、PDF 檔案"
+target        = "manual_librarian"
 require_slots = false
 
 # -----基本intents-----
