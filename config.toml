@@ -29,7 +29,7 @@
 [system]
 domain          = "電子鎖、智慧門鎖相關的產品、安裝、故障排除與售後服務"
 thread_prefix   = "smart_lock_"    # LangGraph thread ID 前綴
-request_timeout = 60               # LangGraph 執行超時秒數
+request_timeout = 120              # LangGraph 執行超時秒數
 sensitive_keywords = ["報價", "價格", "多少錢", "費用", "金流", "退款", "匯款", "轉帳", "支付"]
 
 
@@ -293,8 +293,7 @@ postgres_uri_env       = "POSTGRES_URI"       # PostgreSQL 連線字串
 # sqlite_path          = "./data/db/chat_history.db"  # sqlite 專用，回退時取消註解
 max_messages_threshold = 50                   # messages 超過此數量時觸發語意摘要壓縮
 context_retention_pair = 20                   # 壓縮後保留最近幾對對話（1 對 = 1 human + 1 ai）
-router_context_pairs   = 3                    # router 意圖分類時，附帶最近幾輪對話作為上下文
-agent_context_pairs    = 2                    # agent 派發時，附帶最近幾輪對話（讓 agent 能延續話題）
+router_context_pairs   = 3                    # router 意圖分類時，附帶最近幾輪對話作為上下文（同時濃縮問題給 agent）
 
 
 # ==========================================

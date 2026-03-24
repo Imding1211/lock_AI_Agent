@@ -230,12 +230,27 @@ async def router(state: GraphState, config: RunnableConfig):
     router_messages.extend(recent_context)
     router_messages.append(HumanMessage(content=question))
 
+    print(f"  [router] 送出 {len(router_messages)} 則 messages（含 {len(recent_context)} 則歷史上下文）")
+
     response = await llm.ainvoke(router_messages)
 
-    # 解析 LLM 回覆（可能含多行意圖名稱）
+    # 解析 LLM 回覆：intent 區塊 + consolidated query（用 --- 分隔）
     raw = response.content.strip()
-    intent_names = [line.strip().strip('"').strip("'").lower() for line in raw.splitlines() if line.strip()]
+    consolidated_query = question  # fallback 為原始問題
+
+    if "---" in raw:
+        parts = raw.split("---", 1)
+        intent_block = parts[0].strip()
+        query_block = parts[1].strip()
+        if query_block:
+            consolidated_query = query_block
+    else:
+        intent_block = raw
+
+    intent_names = [line.strip().strip('"').strip("'").lower() for line in intent_block.splitlines() if line.strip()]
     print(f"  [router] 意圖分類結果: {intent_names}")
+    if consolidated_query != question:
+        print(f"  [router] 濃縮問題: {question} → {consolidated_query}")
 
     # 建構意圖名稱 → target 對應表
     intent_to_target = {}
@@ -280,10 +295,16 @@ async def router(state: GraphState, config: RunnableConfig):
 
     print(f"  [router] 派發目標: {targets}")
 
-    return {
+    result = {
         "next_agents": targets,
-        "history": [f"router:{'+'.join(targets)}"]
+        "history": [f"router:{'+'.join(targets)}"],
     }
+
+    # 如果 router 濃縮了問題，更新 question 讓 agent 使用
+    if consolidated_query != question:
+        result["question"] = consolidated_query
+
+    return result
 
 
 

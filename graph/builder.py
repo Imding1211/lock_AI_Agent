@@ -1,12 +1,13 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
+from langchain_core.messages import HumanMessage
 from core.config import LLM_CONFIG, MEMORY_CONFIG, AGENTS_CONFIG
 from core.debug_log import log_messages as debug_log_messages
 from graph.state import GraphState
 from graph.nodes import (
     pre_process, manage_memory, rewrite_query, router,
     merge_answers, update_profile, post_process,
-    llm as base_llm, _extract_recent_pairs
+    llm as base_llm
 )
 from memory import get_checkpointer
 from tools import build_tools, UI_TYPE_MAP
@@ -22,22 +23,13 @@ async def build_graph():
     def route_by_intent(state: GraphState):
         agents = state.get("next_agents", [])
 
-        # summary (SystemMessage) + 近 N 輪對話（含當前 question）
-        agent_context_pairs = MEMORY_CONFIG.get("agent_context_pairs", 2)
+        # summary (SystemMessage) + 濃縮後的問題（router 已將多輪上下文合併為一句）
         agent_msgs = []
         for msg in state.get("messages", []):
             if hasattr(msg, "type") and msg.type == "system":
                 agent_msgs.append(msg)
-        recent = _extract_recent_pairs(
-            state.get("messages", []), agent_context_pairs, skip_latest_human=False
-        )
-        agent_msgs.extend(recent)
-        # 確保最後一則是當前 HumanMessage（若 recent 已含則不重複）
-        if not agent_msgs or agent_msgs[-1].type != "human":
-            for msg in reversed(state.get("messages", [])):
-                if hasattr(msg, "type") and msg.type == "human":
-                    agent_msgs.append(msg)
-                    break
+        # 使用 router 濃縮後的 question（已包含對話上下文）
+        agent_msgs.append(HumanMessage(content=state.get("question", "")))
 
         # [DEBUG] head → agent：派發的 messages
         previews = []
