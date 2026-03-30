@@ -200,7 +200,7 @@ prompt_file = "agents/prompts/store_assistant.md"
 [[agents]]
 name        = "app_specialist"
 label       = "APP 設定專家"
-description = "負責回答 Chatlock AI-99 等智慧鎖 APP 的操作步驟、解除綁定、邀請成員等軟體問題"
+description = "負責回答 Chatlock AI-99 智慧鎖的使用與設定問題，包含「使用者管理(指紋/密碼/人臉/掌靜脈/NFC卡片的新增與刪除)」、「APP功能(遠端開鎖/視訊監看/家庭成員邀請/裝置解綁/清除緩存)」、「系統設定(雙重認證/常開模式/童鎖/門鈴與語音音量/語言切換)」及「裝置維護(Wi-Fi配對/電池更換)」"
 tools       = ["db_youtube", "transfer_to_human"]
 prompt_file = "agents/prompts/app_specialist.md"
 
